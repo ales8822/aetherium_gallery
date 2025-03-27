@@ -1,0 +1,37 @@
+{% extends "base.html" %} {% block title %}{{ page_title }}{% endblock %} {%
+block content %}
+<h1>Gallery</h1>
+
+<div class="gallery-grid">
+  {% if images %} {% for image in images %}
+  <div class="gallery-item">
+    <a href="{{ url_for('image_detail', image_id=image.id) }}">
+      {% if image.thumbnail_path %}
+      <img
+        src="{{ url_for('uploads', path=image.thumbnail_path) }}"
+        alt="{{ image.original_filename or 'Uploaded Image' }}"
+        loading="lazy"
+      />
+      {% else %}
+      <!-- Fallback if no thumbnail -->
+      <img
+        src="{{ url_for('uploads', path=image.filepath) }}"
+        alt="{{ image.original_filename or 'Uploaded Image' }}"
+        style="max-height: 150px; max-width: 150px"
+        loading="lazy"
+      />
+      {% endif %}
+    </a>
+    <p class="filename">{{ image.original_filename or image.filename }}</p>
+    <!-- Add quick actions like favorite toggle later -->
+  </div>
+  {% endfor %} {% else %}
+  <p>
+    No images found. <a href="{{ url_for('upload_form') }}">Upload some!</a>
+  </p>
+  {% endif %}
+</div>
+
+<!-- Add pagination controls later -->
+
+{% endblock %}

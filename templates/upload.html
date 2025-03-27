@@ -1,0 +1,27 @@
+{% extends "base.html" %} {% block title %}{{ page_title }}{% endblock %} {%
+block content %}
+<h1>Upload New Images</h1>
+
+<form
+  action="{{ url_for('handle_upload') }}"
+  method="post"
+  enctype="multipart/form-data"
+>
+  <div>
+    <label for="files">Choose images to upload:</label>
+    <input
+      type="file"
+      id="files"
+      name="files"
+      accept="image/png, image/jpeg, image/webp, image/gif"
+      multiple
+      required
+    />
+  </div>
+  <br />
+  <button type="submit">Upload Images</button>
+</form>
+
+<!-- Add feedback area for upload progress/status using JS later -->
+
+{% endblock %}

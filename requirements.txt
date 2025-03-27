@@ -1,0 +1,8 @@
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.2       # ASGI server + standard dependencies
+SQLAlchemy[asyncio]>=2.0.19     # ORM with asyncio support
+aiosqlite>=0.19.0               # Async driver for SQLite
+python-dotenv>=1.0.0            # For loading .env files
+Jinja2>=3.1.2                   # Templating engine
+python-multipart>=0.0.6         # For handling form data (file uploads)
+Pillow>=10.0.0                  # Image processing library

@@ -1,0 +1,248 @@
+/* Basic Reset & Dark Theme Foundation */
+body {
+  font-family: sans-serif;
+  margin: 0;
+  background-color: #1a1a1a;
+  color: #e0e0e0;
+  line-height: 1.6;
+}
+
+a {
+  color: #64b5f6; /* Light blue */
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+header {
+  background-color: #2a2a2a;
+  padding: 1rem 2rem;
+  border-bottom: 1px solid #444;
+}
+
+nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+nav a {
+  color: #e0e0e0;
+  font-weight: bold;
+}
+
+nav ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  gap: 1.5rem;
+}
+
+nav ul a {
+  font-weight: normal;
+}
+
+main {
+  padding: 2rem;
+  max-width: 1600px; /* Limit max width */
+  margin: 0 auto; /* Center content */
+}
+
+h1,
+h2 {
+  color: #ffffff;
+  border-bottom: 1px solid #555;
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+/* Gallery Grid */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(200px, 1fr)
+  ); /* Responsive grid */
+  gap: 1.5rem;
+}
+
+.gallery-item {
+  background-color: #252525;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s ease-in-out;
+  text-align: center;
+  display: flex; /* Use flexbox for layout */
+  flex-direction: column; /* Stack image and text vertically */
+}
+
+.gallery-item:hover {
+  transform: translateY(-5px);
+}
+
+.gallery-item a {
+  display: block; /* Make link cover the image */
+  flex-grow: 1; /* Allow link/image area to grow */
+  display: flex; /* Center image within */
+  justify-content: center;
+  align-items: center;
+  background-color: #303030; /* BG for image area */
+  min-height: 150px; /* Ensure a minimum height */
+}
+
+.gallery-item img {
+  max-width: 100%;
+  height: auto; /* Maintain aspect ratio */
+  max-height: 200px; /* Limit max height for uniformity */
+  object-fit: cover; /* Cover the area nicely */
+  display: block;
+}
+
+.gallery-item p.filename {
+  font-size: 0.85em;
+  color: #ccc;
+  padding: 0.5rem;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background-color: #252525; /* Match item background */
+}
+
+/* Image Detail Page */
+.image-detail-container {
+  display: grid;
+  grid-template-columns: 2fr 1fr; /* Adjust ratio as needed */
+  gap: 2rem;
+  align-items: start; /* Align items to the top */
+}
+
+.image-view img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 5px;
+  background-color: #303030; /* Background in case of transparency */
+}
+
+.metadata-panel {
+  background-color: #252525;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+.metadata-panel h2 {
+  margin-top: 0;
+  font-size: 1.4em;
+}
+
+.metadata-panel dl {
+  display: grid;
+  grid-template-columns: auto 1fr; /* Label and value */
+  gap: 0.5rem 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.metadata-panel dt {
+  font-weight: bold;
+  color: #aaa;
+}
+
+.metadata-panel dd {
+  margin-left: 0;
+  word-wrap: break-word; /* Wrap long values */
+}
+
+.metadata-panel pre {
+  background-color: #333;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.9em;
+  white-space: pre-wrap; /* Wrap long prompts */
+  word-wrap: break-word;
+  max-height: 200px; /* Limit prompt display height */
+  overflow-y: auto; /* Add scroll if needed */
+  color: #e0e0e0;
+}
+
+/* Forms */
+form label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+}
+
+form input[type="file"],
+form input[type="text"],
+form textarea {
+  display: block;
+  width: 100%;
+  padding: 0.8rem;
+  margin-bottom: 1rem;
+  border: 1px solid #555;
+  background-color: #333;
+  color: #e0e0e0;
+  border-radius: 4px;
+  box-sizing: border-box; /* Include padding in width */
+}
+
+button,
+input[type="submit"] {
+  background-color: #64b5f6;
+  color: #111;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1em;
+  transition: background-color 0.2s ease;
+}
+
+button:hover,
+input[type="submit"]:hover {
+  background-color: #81c7ff;
+}
+
+button.delete-button {
+  background-color: #e57373; /* Red for delete */
+  color: #111;
+}
+button.delete-button:hover {
+  background-color: #ef9a9a;
+}
+
+.actions {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #444;
+}
+
+/* Footer */
+footer {
+  text-align: center;
+  margin-top: 3rem;
+  padding: 1.5rem;
+  font-size: 0.9em;
+  color: #aaa;
+  border-top: 1px solid #444;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .image-detail-container {
+    grid-template-columns: 1fr; /* Stack image and metadata on smaller screens */
+  }
+
+  nav {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  nav ul {
+    margin-top: 1rem;
+    gap: 1rem;
+  }
+}
