@@ -1,3 +1,18 @@
+# Add these lines at the absolute beginning of the file
+import sys
+import os
+print("--- Debug Info ---")
+print(f"Current Working Directory (CWD): {os.getcwd()}")
+print("sys.path:")
+for p in sys.path:
+    print(f"  - {p}")
+print("--- End Debug Info ---")
+print("Attempting imports...") # Add this line right before the 'from fastapi import ...' line
+
+# Existing imports follow...
+from fastapi import FastAPI, Request
+# ... rest of your main.py code
+
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
