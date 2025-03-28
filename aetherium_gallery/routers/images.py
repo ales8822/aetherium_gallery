@@ -12,11 +12,11 @@ from pathlib import Path
 
 router = APIRouter(
     prefix="/api/images", # Prefix for API-specific routes
-    tags=["Images API"],  # Tag for API documentation
+    tags=["Images API"],   # Tag for API documentation
 )
 
 upload_router = APIRouter(
-     tags=["Image Upload"], # Separate tag for the user-facing upload endpoint
+        tags=["Image Upload"], # Separate tag for the user-facing upload endpoint
 )
 
 logger = logging.getLogger(__name__)
@@ -81,7 +81,7 @@ async def handle_image_upload(
 
         finally:
             # Ensure the file descriptor is closed
-             await file.close()
+            await file.close()
 
 
     # Redirect back to the gallery index after processing all files
@@ -120,8 +120,9 @@ async def update_image_api(
     updated_image = await crud.update_image(db=db, db_image=db_image, image_update=image_update)
     return updated_image
 
-@router.delete("/{image_id}", status_code=204)
-async def delete_image_api(image_id: int, db: AsyncSession = Depends(get_db)):
+@router.delete("/{image_id}", status_code=204, name="delete_image_api")
+@router.post("/delete/{image_id}", response_class=RedirectResponse, status_code=303, name="delete_image_api_post")
+async def delete_image_api(image_id: int, request: Request, db: AsyncSession = Depends(get_db)):
     """API endpoint to delete an image."""
     db_image = await crud.get_image(db, image_id) # Fetch before deleting to get filenames
     if db_image is None:
@@ -130,13 +131,15 @@ async def delete_image_api(image_id: int, db: AsyncSession = Depends(get_db)):
     # First, delete files from storage
     files_deleted = utils.delete_image_files(db_image.filename, db_image.thumbnail_path)
     if not files_deleted:
-         # Log a warning, but proceed to delete DB record anyway? Or raise error?
-         logger.warning(f"Could not delete files for image ID {image_id}. Proceeding with DB deletion.")
+            # Log a warning, but proceed to delete DB record anyway? Or raise error?
+            logger.warning(f"Could not delete files for image ID {image_id}. Proceeding with DB deletion.")
 
     # Then, delete the database record
     deleted_record = await crud.delete_image(db, image_id=image_id)
     if deleted_record is None:
-         # This shouldn't happen if we found it above, but handle defensively
-         raise HTTPException(status_code=404, detail="Image found initially but failed to delete from DB")
+            # This shouldn't happen if we found it above, but handle defensively
+            raise HTTPException(status_code=404, detail="Image found initially but failed to delete from DB")
 
-    return None # Return 204 No Content on successful deletion
+    # Redirect back to the gallery
+    gallery_url = request.url_for('gallery_index')
+    return RedirectResponse(url=gallery_url, status_code=303) # Use 303 See Other for POST redirect
