@@ -2,6 +2,38 @@
 
 A web-based application built with Python (FastAPI) to manage, visualize, and categorize AI-generated images, focusing on metadata and creative exploration.
 
+# Project tree structure:
+
+aetherium_gallery/
+├── aetherium_gallery/
+│ ├── routers/
+│ │ ├── **init**.py
+│ │ ├── frontend.py
+│ │ └── images.py
+│ ├── **init**.py
+│ ├── config.py
+│ ├── crud.py
+│ ├── database.py
+│ ├── main.py
+│ ├── models.py
+│ ├── schemas.py
+│ └── utils.py
+├── static/
+│ ├── css/
+│ │ └── style.css
+│ └── js/
+│ └── script.js
+├── templates/
+│ ├── base.html
+│ ├── image.detail.html
+│ ├── index.html
+│ └── upload.html
+├── uploads/
+├── .env
+├── .gitignore
+├── README.md
+└── requirements.txt
+
 ## Features (Initial Setup)
 
 - **Image Upload:** Upload multiple images via a web form.
