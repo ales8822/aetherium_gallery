@@ -1,3 +1,5 @@
+/* static/css/style.css (New Code) */
+
 /* Basic Reset & Dark Theme Foundation */
 body {
   font-family: sans-serif;
@@ -59,117 +61,126 @@ h2 {
   margin-bottom: 1rem;
 }
 
-/* Gallery Grid */
+/* --- MODIFIED GALLERY --- */
+/* Masonry-like Grid Layout */
 .gallery-grid {
-  display: grid;
-  grid-template-columns: repeat(
-    auto-fill,
-    minmax(200px, 1fr)
-  ); /* Responsive grid */
-  gap: 1.5rem;
+  /* This creates a responsive column-based masonry layout */
+  column-count: 5;
+  column-width: 280px; /* Adjust based on your preferred item size */
+  column-gap: 1.5rem;
 }
 
 .gallery-item {
+  width: 100%;
+  display: inline-block; /* Essential for masonry */
+  margin-bottom: 1.5rem; /* Space between rows */
+  break-inside: avoid; /* Prevents items from breaking across columns */
   background-color: #252525;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-  transition: transform 0.2s ease-in-out;
-  text-align: center;
-  display: flex; /* Use flexbox for layout */
-  flex-direction: column; /* Stack image and text vertically */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+  transition: transform 0.3s ease;
 }
 
 .gallery-item:hover {
-  transform: translateY(-5px);
+  transform: scale(1.03);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
 }
 
 .gallery-item a {
-  display: block; /* Make link cover the image */
-  flex-grow: 1; /* Allow link/image area to grow */
-  display: flex; /* Center image within */
-  justify-content: center;
-  align-items: center;
-  background-color: #303030; /* BG for image area */
-  min-height: 150px; /* Ensure a minimum height */
+  display: block;
+  position: relative; /* Needed to position the overlay */
 }
 
 .gallery-item img {
-  max-width: 100%;
-  height: auto; /* Maintain aspect ratio */
-  max-height: 200px; /* Limit max height for uniformity */
-  object-fit: cover; /* Cover the area nicely */
-  display: block;
+  width: 100%; /* Image fills its container */
+  height: auto; /* Height is determined by aspect ratio */
+  display: block; /* Removes any bottom space */
 }
 
+/* NEW: Hover Overlay */
+.gallery-item .overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  opacity: 0; /* Hidden by default */
+  transition: opacity 0.3s ease;
+  display: flex;
+  align-items: flex-end; /* Position text at the bottom */
+  padding: 0.8rem;
+  pointer-events: none; /* Allows clicks to go through to the link */
+}
+
+.gallery-item:hover .overlay {
+  opacity: 1; /* Show on hover */
+}
+
+/* MODIFIED: Filename now lives in the overlay */
 .gallery-item p.filename {
-  font-size: 0.85em;
-  color: #ccc;
-  padding: 0.5rem;
+  font-size: 0.9em;
+  color: #e0e0e0;
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  background-color: #252525; /* Match item background */
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
 }
 
-/* Image Detail Page */
+
+/* Image Detail Page (Unchanged) */
 .image-detail-container {
   display: grid;
-  grid-template-columns: 2fr 1fr; /* Adjust ratio as needed */
+  grid-template-columns: 2fr 1fr;
   gap: 2rem;
-  align-items: start; /* Align items to the top */
+  align-items: start;
 }
-
 .image-view img {
   max-width: 100%;
   height: auto;
   border-radius: 5px;
-  background-color: #303030; /* Background in case of transparency */
+  background-color: #303030;
 }
-
 .metadata-panel {
   background-color: #252525;
   padding: 1.5rem;
   border-radius: 8px;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
-
 .metadata-panel h2 {
   margin-top: 0;
   font-size: 1.4em;
 }
-
 .metadata-panel dl {
   display: grid;
-  grid-template-columns: auto 1fr; /* Label and value */
+  grid-template-columns: auto 1fr;
   gap: 0.5rem 1rem;
   margin-bottom: 1.5rem;
 }
-
 .metadata-panel dt {
   font-weight: bold;
   color: #aaa;
 }
-
 .metadata-panel dd {
   margin-left: 0;
-  word-wrap: break-word; /* Wrap long values */
+  word-wrap: break-word;
 }
-
 .metadata-panel pre {
   background-color: #333;
   padding: 0.5rem;
   border-radius: 4px;
   font-size: 0.9em;
-  white-space: pre-wrap; /* Wrap long prompts */
+  white-space: pre-wrap;
   word-wrap: break-word;
-  max-height: 200px; /* Limit prompt display height */
-  overflow-y: auto; /* Add scroll if needed */
+  max-height: 200px;
+  overflow-y: auto;
   color: #e0e0e0;
 }
 
-/* Forms */
+/* Forms (Unchanged) */
 form label {
   display: block;
   margin-bottom: 0.5rem;
@@ -187,7 +198,7 @@ form textarea {
   background-color: #333;
   color: #e0e0e0;
   border-radius: 4px;
-  box-sizing: border-box; /* Include padding in width */
+  box-sizing: border-box;
 }
 
 button,
@@ -208,7 +219,7 @@ input[type="submit"]:hover {
 }
 
 button.delete-button {
-  background-color: #e57373; /* Red for delete */
+  background-color: #e57373;
   color: #111;
 }
 button.delete-button:hover {
@@ -221,7 +232,8 @@ button.delete-button:hover {
   border-top: 1px solid #444;
 }
 
-/* Footer */
+
+/* Footer (Unchanged) */
 footer {
   text-align: center;
   margin-top: 3rem;
@@ -232,9 +244,22 @@ footer {
 }
 
 /* Responsive Adjustments */
+@media (max-width: 1200px) {
+  .gallery-grid {
+    column-count: 4;
+  }
+}
+@media (max-width: 992px) {
+  .gallery-grid {
+    column-count: 3;
+  }
+}
 @media (max-width: 768px) {
+  .gallery-grid {
+    column-count: 2;
+  }
   .image-detail-container {
-    grid-template-columns: 1fr; /* Stack image and metadata on smaller screens */
+    grid-template-columns: 1fr;
   }
 
   nav {
@@ -245,4 +270,9 @@ footer {
     margin-top: 1rem;
     gap: 1rem;
   }
+}
+@media (max-width: 576px) {
+    .gallery-grid {
+        column-count: 1;
+    }
 }

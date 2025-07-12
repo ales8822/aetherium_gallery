@@ -1,11 +1,27 @@
+<!-- templates/index.html (New Code) -->
 {% extends "base.html" %} {% block title %}{{ page_title }}{% endblock %} {%
 block content %}
+
+<!-- Link to the Lightbox CSS (add this or ensure it's in your base.html head) -->
+<link
+  rel="stylesheet"
+  href="https://cdn.jsdelivr.net/npm/basiclightbox@5.0.4/dist/basicLightbox.min.css"
+/>
+
 <h1>Gallery</h1>
 
 <div class="gallery-grid">
   {% if images %} {% for image in images %}
   <div class="gallery-item">
-    <a href="{{ url_for('image_detail', image_id=image.id) }}">
+    <!-- 
+      The link now has a data-attribute to store the full image URL.
+      This allows our JavaScript to grab it easily for the lightbox.
+    -->
+    <a
+      href="{{ url_for('image_detail', image_id=image.id) }}"
+      data-full-image-url="{{ url_for('uploads', path=image.filepath) }}"
+      class="gallery-link"
+    >
       {% if image.thumbnail_path %}
       <img
         src="{{ url_for('uploads', path=image.thumbnail_path) }}"
@@ -17,13 +33,15 @@ block content %}
       <img
         src="{{ url_for('uploads', path=image.filepath) }}"
         alt="{{ image.original_filename or 'Uploaded Image' }}"
-        style="max-height: 150px; max-width: 150px"
         loading="lazy"
       />
       {% endif %}
+
+      <!-- This is the new overlay that appears on hover -->
+      <div class="overlay">
+        <p class="filename">{{ image.original_filename or image.filename }}</p>
+      </div>
     </a>
-    <p class="filename">{{ image.original_filename or image.filename }}</p>
-    <!-- Add quick actions like favorite toggle later -->
   </div>
   {% endfor %} {% else %}
   <p>
@@ -33,5 +51,36 @@ block content %}
 </div>
 
 <!-- Add pagination controls later -->
+
+<!-- JavaScript for the Lightbox -->
+<!-- Best place for these is right before the closing </body> tag in base.html -->
+<script src="https://cdn.jsdelivr.net/npm/basiclightbox@5.0.4/dist/basicLightbox.min.js"></script>
+
+<script>
+  // Wait for the document to be fully loaded
+  document.addEventListener("DOMContentLoaded", () => {
+    // Select all links in our gallery
+    const galleryLinks = document.querySelectorAll(".gallery-grid a.gallery-link");
+
+    galleryLinks.forEach((link) => {
+      link.addEventListener("click", (event) => {
+        // Prevent the browser from following the link to the detail page
+        event.preventDefault();
+
+        // Get the full image URL from our data attribute
+        const fullImageUrl = link.dataset.fullImageUrl;
+
+        // Create and show the lightbox
+        basicLightbox
+          .create(
+            `
+			<img src="${fullImageUrl}" style="max-width: 90vw; max-height: 90vh;">
+		`
+          )
+          .show();
+      });
+    });
+  });
+</script>
 
 {% endblock %}
