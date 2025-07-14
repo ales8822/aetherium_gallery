@@ -312,6 +312,71 @@ button.delete-button:hover {
   border-top: 1px solid #444;
 }
 
+
+/* --- STEP 4: STYLING FOR LIGHTBOX CAPTION AND BUTTON --- */
+
+/*
+  The basicLightbox library creates a `div.basicLightbox` which is our
+  main full-screen overlay. We use this to center our container.
+*/
+.basicLightbox {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* This is the container we created in our JavaScript */
+.image-lightbox-container {
+  position: relative;
+  line-height: 0; /* Prevents extra space under the image */
+}
+
+/* The caption bar at the bottom of the lightbox */
+.lightbox-caption {
+  box-sizing: border-box; /* Ensures padding is included in the width */
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px); /* Frosty glass effect */
+  color: #fff;
+  padding: 12px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  line-height: 1.5; /* Reset line-height for text */
+}
+
+/* Style for the filename on the left */
+.lightbox-filename {
+  font-size: 0.9em;
+  color: #ccc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 20px;
+}
+
+/* Style for our new button on the right */
+.lightbox-details-button {
+  background-color: #64b5f6;
+  color: #111;
+  font-weight: bold;
+  font-size: 0.9em;
+  padding: 8px 16px;
+  border-radius: 5px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.lightbox-details-button:hover {
+  background-color: #8be0ff;
+  text-decoration: none;
+  transform: scale(1.05);
+}
+
 footer {
   text-align: center;
   margin-top: 3rem;

@@ -70,13 +70,37 @@ block content %}
   document.addEventListener("DOMContentLoaded", () => {
     // Lightbox for full image view
     const galleryLinks = document.querySelectorAll(".gallery-grid a.gallery-link");
-    galleryLinks.forEach((link) => {
-      link.addEventListener("click", (event) => {
-        event.preventDefault();
-        const fullImageUrl = link.dataset.fullImageUrl;
-        basicLightbox.create(`<img src="${fullImageUrl}" style="max-width: 90vw; max-height: 90vh;">`).show();
-      });
-    });
+
+galleryLinks.forEach((link) => {
+  link.addEventListener("click", (event) => {
+    // Prevent the default navigation
+    event.preventDefault();
+
+    // --- GRAB THE DATA WE NEED ---
+    // Get the URL for the full-size image from the data-attribute
+    const fullImageUrl = link.dataset.fullImageUrl;
+    // Get the URL for the detail page directly from the link's href
+    const detailPageUrl = link.href;
+    // Find the filename text from the overlay inside the link
+    const filename = link.querySelector('.overlay .filename').textContent;
+
+
+    // --- BUILD THE NEW LIGHTBOX CONTENT ---
+    // We now create a container with the image AND our new caption/button bar
+    const contentHtml = `
+      <div class="image-lightbox-container">
+        <img src="${fullImageUrl}" style="max-width: 90vw; max-height: 85vh;">
+        <div class="lightbox-caption">
+          <span class="lightbox-filename">${filename}</span>
+          <a href="${detailPageUrl}" class="lightbox-details-button">Details & Actions</a>
+        </div>
+      </div>
+    `;
+
+    // Create and show the lightbox with our new, richer content
+    basicLightbox.create(contentHtml).show();
+  });
+});
 
     // Lightbox for metadata info panel
     const infoIcons = document.querySelectorAll(".info-icon");
