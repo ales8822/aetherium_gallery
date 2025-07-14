@@ -11,73 +11,93 @@ block content %}
 <h1>Gallery</h1>
 
 <div class="gallery-grid">
-  {% if images %} {% for image in images %}
-  <div class="gallery-item">
-    <!-- 
-      The link now has a data-attribute to store the full image URL.
-      This allows our JavaScript to grab it easily for the lightbox.
-    -->
-    <a
-      href="{{ url_for('image_detail', image_id=image.id) }}"
-      data-full-image-url="{{ url_for('uploads', path=image.filepath) }}"
-      class="gallery-link"
-    >
-      {% if image.thumbnail_path %}
-      <img
-        src="{{ url_for('uploads', path=image.thumbnail_path) }}"
-        alt="{{ image.original_filename or 'Uploaded Image' }}"
-        loading="lazy"
-      />
-      {% else %}
-      <!-- Fallback if no thumbnail -->
-      <img
-        src="{{ url_for('uploads', path=image.filepath) }}"
-        alt="{{ image.original_filename or 'Uploaded Image' }}"
-        loading="lazy"
-      />
-      {% endif %}
-
-      <!-- This is the new overlay that appears on hover -->
-      <div class="overlay">
-        <p class="filename">{{ image.original_filename or image.filename }}</p>
-      </div>
+  {% if images %}
+    {% for image in images %}
+      <!-- Each item in the loop is wrapped in this single div -->
+<div class="gallery-item">
+    <!-- The link contains the image and the full-size filename overlay -->
+    <a href="{{ url_for('image_detail', image_id=image.id) }}"
+       data-full-image-url="{{ url_for('uploads', path=image.filepath) }}"
+       class="gallery-link">
+        
+        {% if image.thumbnail_path %}
+        <img src="{{ url_for('uploads', path=image.thumbnail_path) }}" alt="{{ image.original_filename or 'Uploaded Image' }}" loading="lazy" />
+        {% else %}
+        <img src="{{ url_for('uploads', path=image.filepath) }}" alt="{{ image.original_filename or 'Uploaded Image' }}" loading="lazy" />
+        {% endif %}
+    
+        <div class="overlay">
+            <p class="filename">{{ image.original_filename or image.filename }}</p>
+        </div>
     </a>
-  </div>
-  {% endfor %} {% else %}
-  <p>
-    No images found. <a href="{{ url_for('upload_form') }}">Upload some!</a>
-  </p>
-  {% endif %}
-</div>
 
-<!-- Add pagination controls later -->
+    <!-- ▼▼▼ NEW CONTAINER for persistent icons ▼▼▼ -->
+    <div class="persistent-icons">
+        <!-- Resolution -->
+        {% if image.width and image.height %}
+        <div class="image-resolution">
+            <span>{{ image.width }}x{{ image.height }}</span>
+        </div>
+        {% endif %}
+        <!-- Info Icon -->
+        <div class="info-icon"
+             role="button"
+             aria-label="Show image metadata"
+             data-filename="{{ image.original_filename or image.filename }}"
+             data-prompt="{{ image.prompt or '' }}"
+             data-negative-prompt="{{ image.negative_prompt or '' }}"
+             data-sampler="{{ image.sampler or 'N/A' }}"
+             data-steps="{{ image.steps or 'N/A' }}"
+             data-cfg="{{ image.cfg_scale or 'N/A' }}">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" width="18px" height="18px">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+            </svg>
+        </div>
+    </div>
+</div>
+    {% endfor %}
+  {% else %}
+    <p>
+      No images found. <a href="{{ url_for('upload_form') }}">Upload some!</a>
+    </p>
+  {% endif %}
+</div> <!-- End of .gallery-grid -->
 
 <!-- JavaScript for the Lightbox -->
-<!-- Best place for these is right before the closing </body> tag in base.html -->
 <script src="https://cdn.jsdelivr.net/npm/basiclightbox@5.0.4/dist/basicLightbox.min.js"></script>
 
 <script>
-  // Wait for the document to be fully loaded
   document.addEventListener("DOMContentLoaded", () => {
-    // Select all links in our gallery
+    // Lightbox for full image view
     const galleryLinks = document.querySelectorAll(".gallery-grid a.gallery-link");
-
     galleryLinks.forEach((link) => {
       link.addEventListener("click", (event) => {
-        // Prevent the browser from following the link to the detail page
         event.preventDefault();
-
-        // Get the full image URL from our data attribute
         const fullImageUrl = link.dataset.fullImageUrl;
+        basicLightbox.create(`<img src="${fullImageUrl}" style="max-width: 90vw; max-height: 90vh;">`).show();
+      });
+    });
 
-        // Create and show the lightbox
-        basicLightbox
-          .create(
-            `
-			<img src="${fullImageUrl}" style="max-width: 90vw; max-height: 90vh;">
-		`
-          )
-          .show();
+    // Lightbox for metadata info panel
+    const infoIcons = document.querySelectorAll(".info-icon");
+    infoIcons.forEach((icon) => {
+      icon.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const data = icon.dataset;
+        const contentHtml = `
+            <div class="info-lightbox-content">
+                <h3>${data.filename}</h3>
+                <dl>
+                    <dt>Dimensions</dt><dd>${data.dimensions || 'N/A'}</dd>
+                    <dt>Sampler</dt><dd>${data.sampler || 'N/A'}</dd>
+                    <dt>Steps</dt><dd>${data.steps || 'N/A'}</dd>
+                    <dt>CFG Scale</dt><dd>${data.cfg || 'N/A'}</dd>
+                    ${data.prompt ? `<dt>Prompt</dt><dd class="prompt">${data.prompt}</dd>` : ''}
+                    ${data.negativePrompt ? `<dt>Negative Prompt</dt><dd class="prompt">${data.negativePrompt}</dd>` : ''}
+                </dl>
+            </div>
+        `;
+        basicLightbox.create(contentHtml).show();
       });
     });
   });

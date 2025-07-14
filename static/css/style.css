@@ -1,4 +1,4 @@
-/* static/css/style.css (New Code) */
+/* static/css/style.css (Final Clean Version) */
 
 /* Basic Reset & Dark Theme Foundation */
 body {
@@ -49,8 +49,8 @@ nav ul a {
 
 main {
   padding: 2rem;
-  max-width: 1600px; /* Limit max width */
-  margin: 0 auto; /* Center content */
+  max-width: 1600px;
+  margin: 0 auto;
 }
 
 h1,
@@ -61,65 +61,65 @@ h2 {
   margin-bottom: 1rem;
 }
 
-/* --- MODIFIED GALLERY --- */
-/* Masonry-like Grid Layout */
+/* --- Gallery Styles Start Here --- */
+
 .gallery-grid {
-  /* This creates a responsive column-based masonry layout */
   column-count: 5;
-  column-width: 280px; /* Adjust based on your preferred item size */
+  column-width: 280px;
   column-gap: 1.5rem;
 }
 
 .gallery-item {
+  display: inline-block;
   width: 100%;
-  display: inline-block; /* Essential for masonry */
-  margin-bottom: 1.5rem; /* Space between rows */
-  break-inside: avoid; /* Prevents items from breaking across columns */
-  background-color: #252525;
+  margin-bottom: 1.5rem;
+  break-inside: avoid;
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
   transition: transform 0.3s ease;
+  position: relative; /* CRITICAL: Anchor for overlays and icons */
+  background-color: #252525;
 }
 
 .gallery-item:hover {
-  transform: scale(1.03);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
+  transform: scale(1.02);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.6);
+  z-index: 5;
 }
 
-.gallery-item a {
+.gallery-item .gallery-link {
   display: block;
-  position: relative; /* Needed to position the overlay */
+  position: relative;
 }
 
 .gallery-item img {
-  width: 100%; /* Image fills its container */
-  height: auto; /* Height is determined by aspect ratio */
-  display: block; /* Removes any bottom space */
+  width: 100%;
+  height: auto;
+  display: block;
 }
 
-/* NEW: Hover Overlay */
+/* Hover overlay with filename */
 .gallery-item .overlay {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.65);
+  background: linear-gradient(180deg, rgba(0,0,0,0) 60%, rgba(0,0,0,0.85) 100%);
   color: #fff;
-  opacity: 0; /* Hidden by default */
+  opacity: 0;
   transition: opacity 0.3s ease;
   display: flex;
-  align-items: flex-end; /* Position text at the bottom */
+  align-items: flex-end;
   padding: 0.8rem;
-  pointer-events: none; /* Allows clicks to go through to the link */
+  pointer-events: none;
 }
 
 .gallery-item:hover .overlay {
-  opacity: 1; /* Show on hover */
+  opacity: 1;
 }
 
-/* MODIFIED: Filename now lives in the overlay */
 .gallery-item p.filename {
   font-size: 0.9em;
   color: #e0e0e0;
@@ -130,44 +130,96 @@ h2 {
   text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
 }
 
+/* This is the container for the icons in the bottom-right */
+.persistent-icons {
+   position: absolute;
+  bottom: 8px;
+  right: 8px;
+  left: 8px; /* Anchor to both sides to define a clear boundary */
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end; /* THIS IS THE CRITICAL FIX */
+  gap: 8px;
+  pointer-events: none; /* Make only the icons clickable, not the empty space */
+}
 
-/* Image Detail Page (Unchanged) */
+/* Styling for the resolution text */
+.image-resolution {
+   background-color: rgba(0, 0, 0, 0.6);
+  color: #e0e0e0;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  pointer-events: auto; /* Re-enable pointer events for this element */
+}
+
+/* Styling for the info icon button */
+.info-icon {
+  width: 30px;
+  height: 30px;
+  background-color: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: background-color 0.2s ease, transform 0.2s ease;
+  pointer-events: auto; /* Re-enable pointer events for this element */
+}
+
+.info-icon:hover {
+  background-color: #64b5f6; /* Highlight with theme color */
+  transform: scale(1.1);
+}
+
+.info-icon svg {
+  display: block;
+}
+
+
+/* --- Other Page Styles --- */
+
 .image-detail-container {
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: 2rem;
   align-items: start;
 }
-.image-view img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 5px;
-  background-color: #303030;
-}
-.metadata-panel {
+
+.metadata-panel, .info-lightbox-content {
   background-color: #252525;
   padding: 1.5rem;
   border-radius: 8px;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
-.metadata-panel h2 {
+
+.metadata-panel h2, .info-lightbox-content h3 {
   margin-top: 0;
   font-size: 1.4em;
+  color: #ffffff;
 }
-.metadata-panel dl {
+
+.metadata-panel dl, .info-lightbox-content dl {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 0.5rem 1rem;
   margin-bottom: 1.5rem;
 }
-.metadata-panel dt {
+
+.metadata-panel dt, .info-lightbox-content dt {
   font-weight: bold;
   color: #aaa;
 }
-.metadata-panel dd {
+
+.metadata-panel dd, .info-lightbox-content dd {
   margin-left: 0;
   word-wrap: break-word;
 }
+
 .metadata-panel pre {
   background-color: #333;
   padding: 0.5rem;
@@ -180,7 +232,34 @@ h2 {
   color: #e0e0e0;
 }
 
-/* Forms (Unchanged) */
+.info-lightbox-content {
+  max-width: 600px;
+}
+.info-lightbox-content h3 {
+    color: #64b5f6;
+    font-size: 1.2rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-bottom: 1px solid #444;
+    padding-bottom: 0.5rem;
+}
+.info-lightbox-content dd {
+  background-color: #383838;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  font-family: monospace;
+}
+.info-lightbox-content dd.prompt {
+  font-family: sans-serif;
+  white-space: pre-wrap;
+}
+.info-lightbox-content dd:empty::before {
+    content: 'N/A';
+    color: #777;
+    font-style: italic;
+}
+
 form label {
   display: block;
   margin-bottom: 0.5rem;
@@ -222,6 +301,7 @@ button.delete-button {
   background-color: #e57373;
   color: #111;
 }
+
 button.delete-button:hover {
   background-color: #ef9a9a;
 }
@@ -232,8 +312,6 @@ button.delete-button:hover {
   border-top: 1px solid #444;
 }
 
-
-/* Footer (Unchanged) */
 footer {
   text-align: center;
   margin-top: 3rem;
@@ -243,7 +321,8 @@ footer {
   border-top: 1px solid #444;
 }
 
-/* Responsive Adjustments */
+
+/* --- Responsive Adjustments --- */
 @media (max-width: 1200px) {
   .gallery-grid {
     column-count: 4;
@@ -261,7 +340,6 @@ footer {
   .image-detail-container {
     grid-template-columns: 1fr;
   }
-
   nav {
     flex-direction: column;
     align-items: flex-start;
