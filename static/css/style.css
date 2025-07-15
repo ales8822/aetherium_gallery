@@ -377,6 +377,46 @@ button.delete-button:hover {
   transform: scale(1.05);
 }
 
+
+/* --- In-Place Editor Styles for Image Detail Page --- */
+
+/* Initially, all form inputs inside the editor are hidden */
+.metadata-editor .form-control {
+    display: none;
+    width: 100%; /* Ensure inputs fill their container */
+    box-sizing: border-box;
+}
+
+/* Hide the plain text 'dd' elements when in edit mode */
+.metadata-editor.edit-mode .plain-text {
+    display: none;
+}
+
+/* Show the form inputs when in edit mode */
+.metadata-editor.edit-mode .form-control {
+    display: block;
+}
+
+/* Hide the 'Edit' button when in edit mode */
+.metadata-editor.edit-mode #edit-button {
+    display: none;
+}
+
+/*
+The 'Save' and 'Cancel' buttons are inside this container,
+which is hidden by default.
+*/
+.edit-actions {
+    display: none;
+    margin-top: 1rem;
+    gap: 1rem; /* Creates space between Save and Cancel buttons */
+}
+
+/* Show the edit actions container when in edit mode */
+.metadata-editor.edit-mode .edit-actions {
+    display: flex; /* Use flex to align buttons */
+}
+
 footer {
   text-align: center;
   margin-top: 3rem;

@@ -1,84 +1,199 @@
-{% extends "base.html" %} {% block title %}{{ page_title }}{% endblock %} {%
-block content %}
+<!-- templates/image_detail.html (New Version) -->
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
 <h1>Image Details</h1>
 
 <div class="image-detail-container">
-  <div class="image-view">
-    <img
-      src="{{ url_for('uploads', path=image.filepath) }}"
-      alt="{{ image.original_filename or 'Image' }}"
-    />
-  </div>
-  <div class="metadata-panel">
-    <h2>Metadata</h2>
-    <dl>
-      <dt>Filename:</dt>
-      <dd>{{ image.filename }}</dd>
-      <dt>Original Filename:</dt>
-      <dd>{{ image.original_filename or 'N/A' }}</dd>
-      <dt>Uploaded:</dt>
-      <dd>
-        {{ image.upload_date.strftime('%Y-%m-%d %H:%M:%S') if image.upload_date
-        else 'N/A' }}
-      </dd>
-      <dt>Dimensions:</dt>
-      <dd>{{ image.width }}x{{ image.height }}</dd>
-      <dt>Size:</dt>
-      <dd>
-        {{ "%.2f"|format(image.size_bytes / 1024 / 1024) if image.size_bytes
-        else 'N/A' }} MB
-      </dd>
-      <dt>Content Type:</dt>
-      <dd>{{ image.content_type or 'N/A' }}</dd>
-
-      {% if image.prompt %}
-      <dt>Prompt:</dt>
-      <dd><pre>{{ image.prompt }}</pre></dd>
-      {% endif %} {% if image.negative_prompt %}
-      <dt>Negative Prompt:</dt>
-      <dd><pre>{{ image.negative_prompt }}</pre></dd>
-      {% endif %}
-
-      <dt>Seed:</dt>
-      <dd>{{ image.seed if image.seed is not none else 'N/A' }}</dd>
-      <dt>Steps:</dt>
-      <dd>{{ image.steps if image.steps is not none else 'N/A' }}</dd>
-      <dt>CFG Scale:</dt>
-      <dd>{{ image.cfg_scale if image.cfg_scale is not none else 'N/A' }}</dd>
-      <dt>Sampler:</dt>
-      <dd>{{ image.sampler or 'N/A' }}</dd>
-      <dt>Model Hash:</dt>
-      <dd>{{ image.model_hash or 'N/A' }}</dd>
-
-      <!-- Add fields for rating, notes, tags, album later -->
-      <dt>Rating:</dt>
-      <dd>
-        {{ image.user_rating if image.user_rating is not none else 'Not Rated'
-        }}
-      </dd>
-      <dt>Notes:</dt>
-      <dd><pre>{{ image.notes or 'No notes.' }}</pre></dd>
-    </dl>
-
-    <div class="actions">
-      <!-- Add Edit Metadata Button -->
-      <!-- Add Delete Button (use JS confirmation) -->
-      <form
-        action="{{ url_for('delete_image_api_post', image_id=image.id) }}"
-        method="post"
-        onsubmit="return confirm('Are you sure you want to delete this image? This cannot be undone.');"
-        style="display: inline"
-      >
-        <!-- Trick: Use JS to submit DELETE request or use a hidden method field if framework supports it -->
-        <!-- For now, a POST that leads to DELETE logic -->
-        <button type="submit" class="delete-button">Delete Image</button>
-      </form>
+    <div class="image-view">
+        <img src="{{ url_for('uploads', path=image.filepath) }}" alt="{{ image.original_filename or 'Image' }}" />
     </div>
-  </div>
-</div>
 
-{% endblock %} {% block scripts_extra %}
+    <!-- We wrap the whole panel in a div that our JS will target -->
+    <div id="metadata-editor-panel" class="metadata-panel metadata-editor" data-image-id="{{ image.id }}">
+        <h2>Metadata</h2>
+
+        <!-- This form will be submitted via JavaScript -->
+        <form id="edit-form">
+            <dl>
+                <!-- Static fields that are not editable -->
+                <dt>Filename:</dt> <dd>{{ image.filename }}</dd>
+                <dt>Original Filename:</dt> <dd>{{ image.original_filename or 'N/A' }}</dd>
+                <dt>Uploaded:</dt> <dd>{{ image.upload_date.strftime('%Y-%m-%d %H:%M:%S') if image.upload_date else 'N/A' }}</dd>
+                <dt>Dimensions:</dt> <dd>{{ image.width }}x{{ image.height }}</dd>
+                <dt>Size:</dt> <dd>{{ "%.2f"|format(image.size_bytes / 1024 / 1024) if image.size_bytes else 'N/A' }} MB</dd>
+                <dt>Content Type:</dt> <dd>{{ image.content_type or 'N/A' }}</dd>
+
+                <!-- Editable Fields Below -->
+                <!-- Each editable field has both a 'plain-text' span and a 'form-control' input -->
+
+                <dt>Prompt:</dt>
+                <dd>
+                    <pre class="plain-text">{{ image.prompt or 'N/A' }}</pre>
+                    <textarea name="prompt" class="form-control" rows="5">{{ image.prompt or '' }}</textarea>
+                </dd>
+
+                <dt>Negative Prompt:</dt>
+                <dd>
+                    <pre class="plain-text">{{ image.negative_prompt or 'N/A' }}</pre>
+                    <textarea name="negative_prompt" class="form-control" rows="3">{{ image.negative_prompt or '' }}</textarea>
+                </dd>
+
+                <dt>Seed:</dt>
+                <dd>
+                    <span class="plain-text">{{ image.seed if image.seed is not none else 'N/A' }}</span>
+                    <input type="text" name="seed" class="form-control" value="{{ image.seed or '' }}">
+                </dd>
+                
+                <dt>Steps:</dt>
+                <dd>
+                    <span class="plain-text">{{ image.steps if image.steps is not none else 'N/A' }}</span>
+                    <input type="number" name="steps" class="form-control" value="{{ image.steps or '' }}">
+                </dd>
+
+                <dt>CFG Scale:</dt>
+                <dd>
+                    <span class="plain-text">{{ image.cfg_scale if image.cfg_scale is not none else 'N/A' }}</span>
+                    <input type="number" step="0.1" name="cfg_scale" class="form-control" value="{{ image.cfg_scale or '' }}">
+                </dd>
+
+                <dt>Sampler:</dt>
+                <dd>
+                    <span class="plain-text">{{ image.sampler or 'N/A' }}</span>
+                    <input type="text" name="sampler" class="form-control" value="{{ image.sampler or '' }}">
+                </dd>
+
+                <dt>Notes:</dt>
+                <dd>
+                    <pre class="plain-text">{{ image.notes or 'No notes.' }}</pre>
+                    <textarea name="notes" class="form-control" rows="4">{{ image.notes or '' }}</textarea>
+                </dd>
+            </dl>
+        </form>
+
+        <div class="actions">
+            <!-- Main action buttons -->
+            <button type="button" id="edit-button">Edit Details</button>
+            
+            <div class="edit-actions">
+                <button type="button" id="save-button">Save Changes</button>
+                <button type="button" id="cancel-button" class="delete-button">Cancel</button>
+            </div>
+            
+            <hr style="margin: 1.5rem 0;">
+
+            <!-- Delete button remains separate -->
+            <form action="{{ url_for('delete_image_api_post', image_id=image.id) }}" method="post" onsubmit="return confirm('Are you sure you want to delete this image? This cannot be undone.');" style="display: inline">
+                <button type="submit" class="delete-button">Delete Image</button>
+            </form>
+        </div>
+        <div id="status-message" style="margin-top: 1rem; font-weight: bold;"></div>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block scripts_extra %}
 <script>
-  // Add JavaScript for delete confirmation or fetch-based deletion later
+document.addEventListener('DOMContentLoaded', function () {
+    const editorPanel = document.getElementById('metadata-editor-panel');
+    const editButton = document.getElementById('edit-button');
+    const saveButton = document.getElementById('save-button');
+    const cancelButton = document.getElementById('cancel-button');
+    const editForm = document.getElementById('edit-form');
+    const statusMessage = document.getElementById('status-message');
+    const imageId = editorPanel.dataset.imageId;
+
+    // --- Event Listeners ---
+    editButton.addEventListener('click', () => {
+        enterEditMode();
+    });
+
+    cancelButton.addEventListener('click', () => {
+        leaveEditMode();
+        // Optional: Reset form fields to their original state if needed
+        editForm.reset();
+    });
+
+    saveButton.addEventListener('click', () => {
+        saveChanges();
+    });
+
+
+    // --- Functions ---
+    function enterEditMode() {
+        editorPanel.classList.add('edit-mode');
+    }
+
+    function leaveEditMode() {
+        editorPanel.classList.remove('edit-mode');
+        statusMessage.textContent = ''; // Clear status message
+    }
+
+    function saveChanges() {
+        const formData = new FormData(editForm);
+        // FormData doesn't capture all types well, let's build an object
+        const updateData = {};
+        for (const [key, value] of formData.entries()) {
+            if (value !== '') { // Only include fields that have a value
+                const inputElement = editForm.elements[key];
+                if (inputElement.type === 'number' && value) {
+                    updateData[key] = parseFloat(value);
+                } else {
+                    updateData[key] = value;
+                }
+            }
+        }
+
+        statusMessage.textContent = 'Saving...';
+        statusMessage.style.color = '#e0e0e0';
+
+        fetch(`/api/images/${imageId}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(updateData),
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => { throw new Error(err.detail || 'An unknown error occurred.'); });
+            }
+            return response.json();
+        })
+        .then(updatedImage => {
+            // Update the 'plain-text' fields with the new data from the server
+            updateTextViews(updatedImage);
+            statusMessage.textContent = 'Successfully saved!';
+            statusMessage.style.color = '#81c784'; // Green for success
+            setTimeout(leaveEditMode, 1500); // Exit edit mode after 1.5s
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            statusMessage.textContent = `Error: ${error.message}`;
+            statusMessage.style.color = '#e57373'; // Red for error
+        });
+    }
+    
+    function updateTextViews(data) {
+        // Find all plain-text elements and update their content from the response data
+        editorPanel.querySelectorAll('.plain-text').forEach(el => {
+            const fieldName = el.nextElementSibling.name; // Get name from sibling input/textarea
+            if (fieldName in data && data[fieldName] !== null) {
+                // For preformatted text, update innerText. For others, textContent.
+                if (el.tagName === 'PRE') {
+                    el.innerText = data[fieldName];
+                } else {
+                    el.textContent = data[fieldName];
+                }
+            } else if (fieldName in data && data[fieldName] === null) {
+                el.textContent = 'N/A'; // Handle cases where a value is cleared
+            }
+        });
+    }
+});
 </script>
 {% endblock %}
+
