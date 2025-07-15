@@ -4,7 +4,10 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 import logging
-
+from fastapi import File, Form, UploadFile
+from PIL import Image as PILImage # Use an alias to avoid name conflicts
+import json
+import io
 from .. import crud, models, schemas, utils
 from ..database import get_db
 from ..config import settings
@@ -23,72 +26,104 @@ logger = logging.getLogger(__name__)
 
 # --- User-Facing Upload Endpoint (part of the web UI flow) ---
 
-@upload_router.post("/upload", response_class=RedirectResponse, name="handle_upload")
-async def handle_image_upload(
-    request: Request, # Needed for URL generation
-    files: List[UploadFile] = File(..., description="Images to upload"),
-    db: AsyncSession = Depends(get_db)
+@upload_router.post("/upload-staged", response_class=RedirectResponse, name="handle_staged_upload")
+async def handle_staged_image_upload(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    file: UploadFile = File(...),
+    original_filename: str = Form(...),
+    prompt: Optional[str] = Form(None),
+    negative_prompt: Optional[str] = Form(None),
+    steps: Optional[int] = Form(None),
+    sampler: Optional[str] = Form(None),
+    cfg_scale: Optional[float] = Form(None),
+    seed: Optional[str] = Form(None), # Use string to handle large seeds from form
+    notes: Optional[str] = Form(None),
 ):
-    """Handles image uploads from the web form."""
-    processed_count = 0
-    error_count = 0
+    """
+    Handles the submission from the new advanced upload form with a single
+    image and its potentially user-edited metadata.
+    """
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Uploaded file is not a valid image.")
 
-    if not files:
-        # Redirect back with an error message? Or handle in frontend JS
-        raise HTTPException(status_code=400, detail="No files were uploaded.")
+    logger.info(f"Processing staged upload: {original_filename}")
+    try:
+        # We read the file content into memory once to be used by multiple functions
+        content = await file.read()
+        file_bytes_io = io.BytesIO(content)
 
-    for file in files:
-        if not file.content_type or not file.content_type.startswith("image/"):
-            logger.warning(f"Skipping non-image file: {file.filename} ({file.content_type})")
-            error_count += 1
-            continue # Skip non-image files
+        # 1. Generate unique filename
+        filename_stem, extension, safe_filename = utils.generate_safe_filename(original_filename)
 
-        original_filename = file.filename
-        logger.info(f"Processing uploaded file: {original_filename}")
+        # 2. Save the image from the in-memory bytes
+        saved_path = utils.save_uploaded_image(file_bytes_io, safe_filename)
 
-        try:
-            # 1. Generate unique filename & save
-            filename_stem, extension, safe_filename = utils.generate_safe_filename(original_filename)
-            saved_path = utils.save_uploaded_image(file, safe_filename)
+        # 3. Generate a thumbnail from the in-memory bytes
+        file_bytes_io.seek(0) # Reset the "cursor" of the in-memory file
+        thumbnail_filename = utils.generate_thumbnail(file_bytes_io, filename_stem, extension)
+        
+        # 4. Get image dimensions (re-opening the saved file is most reliable)
+        with PILImage.open(saved_path) as img:
+            width, height = img.size
 
-            # 2. Generate Thumbnail
-            thumbnail_filename = utils.generate_thumbnail(saved_path, filename_stem, extension)
+        # 5. Prepare data for DB record USING THE FORM DATA
+        image_data = {
+            "filename": safe_filename,
+            "original_filename": original_filename,
+            "filepath": safe_filename,
+            "thumbnail_path": thumbnail_filename,
+            "content_type": file.content_type,
+            "size_bytes": len(content), # Get size from the in-memory content
+            "width": width,
+            "height": height,
+            # Use the data from the form fields
+            "prompt": prompt,
+            "negative_prompt": negative_prompt,
+            "steps": steps,
+            "sampler": sampler,
+            "cfg_scale": cfg_scale,
+            "seed": int(seed) if seed and seed.isdigit() else None,
+            "notes": notes,
+        }
 
-            # 3. Parse Metadata (Basic)
-            metadata = utils.parse_metadata_from_image(saved_path)
+        # 6. Create the database record
+        await crud.create_image(db=db, image_data=image_data)
+        logger.info(f"Successfully processed staged upload: {original_filename} as {safe_filename}")
 
-            # 4. Prepare data for DB record
-            image_data = {
-                "filename": safe_filename,
-                "original_filename": original_filename,
-                "filepath": safe_filename, # Store relative path/filename
-                "thumbnail_path": thumbnail_filename, # Store relative path/filename
-                "content_type": file.content_type,
-                "size_bytes": saved_path.stat().st_size if saved_path.exists() else None,
-                # Add parsed metadata:
-                **metadata # Unpack the dict, only keys matching model fields will be used
-            }
+    except Exception as e:
+        logger.error(f"Failed to process staged file {original_filename}: {e}", exc_info=True)
+    finally:
+        await file.close()
 
-            # 5. Create DB Record
-            await crud.create_image(db=db, image_data=image_data)
-            processed_count += 1
-            logger.info(f"Successfully processed and saved: {original_filename} as {safe_filename}")
-
-        except Exception as e:
-            logger.error(f"Failed to process file {original_filename}: {e}", exc_info=True)
-            error_count += 1
-            # Consider cleanup of partially saved files if needed
-
-        finally:
-            # Ensure the file descriptor is closed
-            await file.close()
-
-
-    # Redirect back to the gallery index after processing all files
-    # Optionally add query params for success/error messages
-    # status_message = f"Processed: {processed_count}, Errors: {error_count}"
     gallery_url = request.url_for('gallery_index')
-    return RedirectResponse(url=gallery_url, status_code=303) # Use 303 See Other for POST redirect
+    return RedirectResponse(url=gallery_url, status_code=303)
+
+
+@router.post("/extract-metadata", summary="Extract metadata from an uploaded image")
+async def extract_metadata_from_image(file: UploadFile = File(...)):
+    """
+    Accepts an image file, extracts metadata using Pillow, and returns it.
+    This does not save the image or create any database records.
+    """
+    # This logic can be moved to a `utils.py` function if you prefer
+    try:
+        # Since Pillow might need to re-read the stream, we load it into memory
+        content = await file.read()
+        image = PILImage.open(io.BytesIO(content))
+        
+        extracted_data = utils.parse_metadata_from_image(io.BytesIO(content))
+
+        # We also want to include dimensions
+        width, height = image.size
+        extracted_data["width"] = width
+        extracted_data["height"] = height
+        
+        return extracted_data
+
+    except Exception as e:
+        logger.error(f"Pillow failed to process image metadata: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to process image metadata: {str(e)}")
 
 
 # --- API Endpoints (Example: could be used by a JavaScript frontend later) ---

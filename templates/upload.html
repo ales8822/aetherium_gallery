@@ -1,27 +1,173 @@
-{% extends "base.html" %} {% block title %}{{ page_title }}{% endblock %} {%
-block content %}
-<h1>Upload New Images</h1>
+<!-- templates/upload.html (Final Version) -->
+{% extends "base.html" %}
 
-<form
-  action="{{ url_for('handle_upload') }}"
-  method="post"
-  enctype="multipart/form-data"
->
-  <div>
-    <label for="files">Choose images to upload:</label>
-    <input
-      type="file"
-      id="files"
-      name="files"
-      accept="image/png, image/jpeg, image/webp, image/gif"
-      multiple
-      required
-    />
-  </div>
-  <br />
-  <button type="submit">Upload Images</button>
+{% block title %}Upload Image{% endblock %}
+
+{% block content %}
+<h1>Upload New Image</h1>
+
+<!-- Form now points to our new "staged" endpoint -->
+<form action="{{ url_for('handle_staged_upload') }}" method="post" enctype="multipart/form-data" id="upload-form">
+
+    <div class="upload-grid">
+        <!-- Column 1: File Input & Preview -->
+        <div class="upload-col-preview">
+            <!-- IMPORTANT: The 'name' must match your FastAPI endpoint parameter -->
+            <input type="file" id="image-upload" name="file" accept="image/png, image/jpeg, image/webp" required class="file-input">
+            
+            <div id="preview-container" class="preview-container">
+                <img id="image-preview" src="#" alt="Image Preview" class="image-preview" />
+                <div id="preview-text" class="preview-text">Select an image to see a preview</div>
+                <div id="loading-spinner" class="loading-spinner" style="display: none;">
+                    <div class="spinner"></div>
+                    Extracting Metadata...
+                </div>
+            </div>
+        </div>
+
+        <!-- Column 2: Editable Metadata Fields -->
+        <div class="upload-col-metadata">
+            <h2>Image Details (Edit as needed)</h2>
+            <div class="form-group">
+                <label for="original_filename">Original Filename</label>
+                <!-- This field is for display; the original name is handled automatically -->
+                <input type="text" id="original_filename" name="original_filename" readonly>
+            </div>
+            
+            <div class="form-group">
+                <label for="prompt">Prompt</label>
+                <textarea id="prompt" name="prompt" rows="5"></textarea>
+            </div>
+            
+            <div class.form-group">
+                <label for="negative_prompt">Negative Prompt</label>
+                <textarea id="negative_prompt" name="negative_prompt" rows="3"></textarea>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="steps">Steps</label>
+                    <input type="number" id="steps" name="steps">
+                </div>
+                <div class="form-group">
+                    <label for="sampler">Sampler</label>
+                    <input type="text" id="sampler" name="sampler">
+                </div>
+            </div>
+
+             <div class="form-row">
+                <div class="form-group">
+                    <label for="cfg_scale">CFG Scale</label>
+                    <input type="number" step="0.1" id="cfg_scale" name="cfg_scale">
+                </div>
+                <div class="form-group">
+                    <label for="seed">Seed</label>
+                    <input type="text" id="seed" name="seed"> <!-- Text type handles large seeds better -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" id="submit-button" disabled>Upload Image</button>
+    </div>
+
 </form>
 
-<!-- Add feedback area for upload progress/status using JS later -->
+<!-- NEW JAVASCRIPT BLOCK -->
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const uploadInput = document.getElementById("image-upload");
+    const previewContainer = document.getElementById("preview-container");
+    const previewImage = document.getElementById("image-preview");
+    const previewText = document.getElementById("preview-text");
+    const loadingSpinner = document.getElementById("loading-spinner");
+    const submitButton = document.getElementById("submit-button");
+    const form = document.getElementById("upload-form");
+
+    uploadInput.addEventListener("change", (event) => {
+        const file = event.target.files[0];
+        if (!file) {
+            submitButton.disabled = true;
+            return;
+        }
+
+        // Part 1: Show image preview instantly
+        previewImage.src = URL.createObjectURL(file);
+        previewImage.style.display = 'block';
+        previewText.style.display = 'none';
+
+        // Part 2: Fetch metadata
+        loadingSpinner.style.display = 'flex';
+        submitButton.disabled = true; // Disable until metadata is loaded
+        const formData = new FormData();
+        formData.append("file", file);
+
+        fetch("/api/images/extract-metadata", { method: "POST", body: formData })
+            .then(response => {
+                if (!response.ok) return response.json().then(err => { throw new Error(err.detail); });
+                return response.json();
+            })
+            .then(data => {
+                // Part 3: Populate the form
+                form.elements['original_filename'].value = file.name;
+                form.elements['prompt'].value = data.prompt || '';
+                form.elements['negative_prompt'].value = data.negative_prompt || '';
+                form.elements['steps'].value = data.steps || '';
+                form.elements['sampler'].value = data.sampler || '';
+                form.elements['cfg_scale'].value = data.cfg_scale || '';
+                form.elements['seed'].value = data.seed || '';
+                
+                loadingSpinner.style.display = 'none';
+                submitButton.disabled = false; // Enable submission
+            })
+            .catch(error => {
+                console.error("Metadata extraction failed:", error);
+                alert(`Could not get metadata: ${error.message}. You can still upload manually.`);
+                form.elements['original_filename'].value = file.name; // At least set the filename
+                loadingSpinner.style.display = 'none';
+                submitButton.disabled = false; // Enable submission even if metadata fails
+            });
+    });
+});
+</script>
+
+
+<!-- New CSS (or add to your main style.css) -->
+<style>
+    .upload-grid { display: grid; grid-template-columns: 300px 1fr; gap: 2.5rem; align-items: flex-start; }
+    .file-input { margin-bottom: 1rem; }
+    .preview-container {
+        width: 100%; height: 300px;
+        border: 2px dashed #444; border-radius: 8px;
+        display: flex; justify-content: center; align-items: center;
+        position: relative; overflow: hidden; background-color: #252525;
+    }
+    .image-preview { display: none; width: 100%; height: 100%; object-fit: contain; }
+    .preview-text { color: #888; }
+    .loading-spinner {
+        position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.7); color: white;
+        display: flex; justify-content: center; align-items: center;
+        flex-direction: column; gap: 1rem; font-weight: bold;
+    }
+    .spinner {
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top: 4px solid #64b5f6;
+        width: 40px; height: 40px;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .form-row { display: flex; gap: 1rem; }
+    .form-group { flex-grow: 1; margin-bottom: 1rem; }
+    .form-group label { display: block; margin-bottom: 0.5rem; color: #ccc; font-weight: bold; font-size: 0.9em;}
+    form input, form textarea { width: 100%; box-sizing: border-box; resize: vertical;}
+    form input[readonly] { background-color: #3f3f3f; cursor: not-allowed; border-color: #555;}
+    .form-actions { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #444; text-align: right; }
+    #submit-button:disabled { background-color: #555; color: #999; cursor: not-allowed; }
+
+    @media (max-width: 768px) { .upload-grid { grid-template-columns: 1fr; } }
+</style>
 
 {% endblock %}
