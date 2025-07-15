@@ -34,10 +34,11 @@ async def handle_staged_image_upload(
     original_filename: str = Form(...),
     prompt: Optional[str] = Form(None),
     negative_prompt: Optional[str] = Form(None),
-    steps: Optional[int] = Form(None),
+    # ▼▼▼ CHANGE 1: Accept problematic fields as Optional[str] ▼▼▼
+    steps: Optional[str] = Form(None),
     sampler: Optional[str] = Form(None),
-    cfg_scale: Optional[float] = Form(None),
-    seed: Optional[str] = Form(None), # Use string to handle large seeds from form
+    cfg_scale: Optional[str] = Form(None),
+    seed: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
 ):
     """
@@ -66,6 +67,24 @@ async def handle_staged_image_upload(
         # 4. Get image dimensions (re-opening the saved file is most reliable)
         with PILImage.open(saved_path) as img:
             width, height = img.size
+            
+        # ▼▼▼ CHANGE 2: Manually convert the string values to numbers inside the function ▼▼▼
+        # This gives us full control over empty strings.
+        try:
+            steps_int = int(steps) if steps else None
+        except (ValueError, TypeError):
+            steps_int = None
+            
+        try:
+            cfg_float = float(cfg_scale) if cfg_scale else None
+        except (ValueError, TypeError):
+            cfg_float = None
+
+        try:
+            seed_int = int(seed) if seed and seed.isdigit() else None
+        except (ValueError, TypeError):
+            seed_int = None
+
 
         # 5. Prepare data for DB record USING THE FORM DATA
         image_data = {
@@ -74,17 +93,18 @@ async def handle_staged_image_upload(
             "filepath": safe_filename,
             "thumbnail_path": thumbnail_filename,
             "content_type": file.content_type,
-            "size_bytes": len(content), # Get size from the in-memory content
+            "size_bytes": len(content),
             "width": width,
             "height": height,
             # Use the data from the form fields
             "prompt": prompt,
             "negative_prompt": negative_prompt,
-            "steps": steps,
             "sampler": sampler,
-            "cfg_scale": cfg_scale,
-            "seed": int(seed) if seed and seed.isdigit() else None,
             "notes": notes,
+            # Use our safely converted values
+            "steps": steps_int,
+            "cfg_scale": cfg_float,
+            "seed": seed_int,
         }
 
         # 6. Create the database record
