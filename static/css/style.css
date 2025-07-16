@@ -417,6 +417,37 @@ which is hidden by default.
     display: flex; /* Use flex to align buttons */
 }
 
+/* --- Search Form Styles --- */
+.search-form {
+    display: flex;
+    align-items: center;
+}
+.search-form input[type="search"] {
+    background-color: #333;
+    border: 1px solid #555;
+    color: #e0e0e0;
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px 0 0 4px; /* Rounded on the left */
+    border-right: none;
+}
+.search-form button[type="submit"] {
+    padding: 0.4rem 0.8rem;
+    border-radius: 0 4px 4px 0; /* Rounded on the right */
+    background-color: #444;
+    cursor: pointer;
+    border: 1px solid #555;
+}
+.search-form button[type="submit"]:hover {
+    background-color: #555;
+}
+.search-summary {
+    font-size: 1.2em;
+    color: #ccc;
+    margin-bottom: 2rem;
+    border-left: 3px solid #64b5f6;
+    padding-left: 1rem;
+}
+
 footer {
   text-align: center;
   margin-top: 3rem;

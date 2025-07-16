@@ -1,5 +1,6 @@
 # aetherium_gallery/routers/frontend.py
-from fastapi import APIRouter, Request, Depends, HTTPException
+from typing import Optional
+from fastapi import APIRouter, Request, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -57,6 +58,31 @@ async def read_image_detail(request: Request, image_id: int, db: AsyncSession = 
         "upload_folder": f"/{settings.UPLOAD_FOLDER}", # Access UPLOAD_FOLDER from the settings instance
         "page_title": f"Image - {db_image.original_filename or db_image.filename}",
         "now": datetime.datetime.now, # Pass it here too
+    })
+
+@router.get("/search", response_class=HTMLResponse, name="search")
+async def search_results(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    # Use Query() for better validation and documentation
+    q: Optional[str] = Query(None, min_length=2, max_length=100)
+):
+    """Displays search results based on a query."""
+    safe_mode_enabled = request.cookies.get("safe_mode", "off") == "on"
+    
+    images = []
+    if q:
+        # Call our new CRUD function
+        images = await crud.search_images(db, query=q, safe_mode=safe_mode_enabled, limit=100)
+
+    return templates.TemplateResponse("search_results.html", {
+        "request": request,
+        "images": images,
+        "image_count": len(images),
+        "search_query": q,
+        "page_title": f"Search results for '{q}'",
+        "now": datetime.datetime.now,
+        "safe_mode": safe_mode_enabled,
     })
 
 # Add routes for viewing/managing tags and albums later

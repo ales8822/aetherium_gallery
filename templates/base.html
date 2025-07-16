@@ -62,6 +62,13 @@
               <span>SFW</span>
             </label>
           </li>
+          <!-- ▼▼▼ ADD THIS NEW LIST ITEM ▼▼▼ -->
+          <li>
+            <form action="{{ url_for('search') }}" method="get" class="search-form">
+              <input type="search" name="q" placeholder="Search prompts..." required minlength="2">
+              <button type="submit">Search</button>
+            </form>
+          </li>
 
         </ul>
       </nav>

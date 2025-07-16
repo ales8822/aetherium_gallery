@@ -1,0 +1,23 @@
+<!-- templates/search_results.html -->
+{% extends "base.html" %}
+
+{% block title %}Search Results for "{{ search_query }}"{% endblock %}
+
+{% block content %}
+    <h1>Search Results</h1>
+    <p class="search-summary">
+        Found <strong>{{ image_count }}</strong> results for "<strong>{{ search_query }}</strong>".
+    </p>
+
+    <!--
+      We reuse the exact same gallery grid display from index.html.
+      If you ever change the gallery display, you only need to change it
+      in this included file, and it will update everywhere.
+    -->
+    {% if images %}
+        {% include 'partials/gallery_grid.html' %}
+    {% else %}
+        <p>No images found matching your search criteria.</p>
+    {% endif %}
+
+{% endblock %}

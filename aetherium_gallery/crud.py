@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from . import models, schemas
 from typing import List, Optional
+from sqlalchemy import or_
 
 # --- Image CRUD ---
 
@@ -55,6 +56,40 @@ async def delete_image(db: AsyncSession, image_id: int) -> Optional[models.Image
         await db.commit()
         return db_image
     return None
+
+
+async def search_images(
+    db: AsyncSession, query: str, safe_mode: bool = False, skip: int = 0, limit: int = 100
+) -> List[models.Image]:
+    """
+    Searches for images where the query string matches in the prompt,
+    negative prompt, or original filename.
+    """
+    if not query:
+        return []
+
+    # The search term needs to be wrapped with % for a 'contains' search
+    search_term = f"%{query}%"
+
+    # Start building the database query
+    db_query = select(models.Image).filter(
+        # Use or_ to find matches in any of the specified fields
+        or_(
+            models.Image.prompt.ilike(search_term),
+            models.Image.negative_prompt.ilike(search_term),
+            models.Image.original_filename.ilike(search_term),
+        )
+    )
+
+    # Apply the safe mode filter if it's enabled
+    if safe_mode:
+        db_query = db_query.filter(models.Image.is_nsfw == False)
+    
+    # Apply ordering and pagination
+    db_query = db_query.order_by(models.Image.upload_date.desc()).offset(skip).limit(limit)
+
+    result = await db.execute(db_query)
+    return result.scalars().all()
 
 
 # --- Add CRUD functions for Tags and Albums later ---
