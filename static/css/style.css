@@ -467,6 +467,147 @@ footer {
   border-top: 1px solid #444;
 }
 
+/* --- Bulk Selection Mode Styles --- */
+
+/* Style for the main 'Select' button in the nav */
+.select-mode-button {
+    background-color: #333;
+    border: 1px solid #555;
+    color: #e0e0e0;
+    padding: 0.4rem 1rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 4px; /* Added for consistency */
+}
+
+/* Style for when the button is active (selection mode is on) */
+.select-mode-button.active {
+    background-color: #64b5f6;
+    color: #111;
+    border-color: #64b5f6;
+    font-weight: bold;
+}
+
+/* When the body has the 'selection-mode-active' class, change the gallery items */
+.selection-mode-active .gallery-item {
+    cursor: pointer;
+    /* Add a subtle border to indicate clickability */
+    border: 3px solid transparent; 
+}
+
+/* This is the blueish overlay that appears on hover in selection mode */
+.selection-mode-active .gallery-item .selection-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(100, 181, 246, 0.3); /* Light blue overlay */
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    /* Make sure overlay is not clickable so the item itself gets the click */
+    pointer-events: none;
+}
+
+.selection-mode-active .gallery-item:hover .selection-overlay {
+    opacity: 1;
+}
+
+/* This is the checkmark container that is always visible in selection mode */
+.selection-mode-active .selection-checkbox {
+    position: absolute;
+    top: 10px; right: 10px;
+    width: 28px; height: 28px;
+    background-color: rgba(0, 0, 0, 0.6);
+    border: 2px solid white;
+    border-radius: 50%;
+    z-index: 20;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: all 0.2s ease;
+    pointer-events: none; /* Make sure overlay is not clickable */
+}
+/* The actual SVG checkmark icon inside the box (initially hidden) */
+.selection-checkbox svg {
+    display: none;
+    fill: white;
+}
+
+/* These styles are applied to an item when it has the .selected class */
+.gallery-item.selected {
+    border-color: #64b5f6; /* Highlight border */
+    transform: scale(1.03);
+}
+.gallery-item.selected .selection-overlay {
+    opacity: 1; /* Keep overlay visible */
+}
+.gallery-item.selected .selection-checkbox {
+    background-color: #64b5f6; /* Highlight checkbox */
+}
+.gallery-item.selected .selection-checkbox svg {
+    display: block; /* Show checkmark icon */
+}
+
+/* Disable links and other icons in selection mode to prevent navigating away */
+.selection-mode-active .gallery-link,
+.selection-mode-active .persistent-icons {
+    /* pointer-events: none; */
+}
+
+
+/* --- Bulk Actions Panel Styles --- */
+.bulk-actions-panel {
+    box-sizing: border-box;
+    position: fixed;
+    bottom: -150px; /* Start hidden off-screen */
+    left: 0;
+    width: 100%;
+    background-color: #2a2a2a;
+    border-top: 2px solid #64b5f6; /* Highlight border */
+    padding: 1rem 2rem;
+    z-index: 1000;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 -5px 15px rgba(0,0,0,0.3);
+    transition: bottom 0.3s ease-in-out;
+}
+
+/* When the panel has the .visible class, slide it into view */
+.bulk-actions-panel.visible {
+    bottom: 0; 
+}
+
+.selection-count {
+    font-size: 1.1em;
+    font-weight: bold;
+}
+.selection-count span {
+    background-color: #64b5f6;
+    color: #111;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    margin-right: 0.5rem;
+}
+
+.action-buttons {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+.action-buttons .form-group {
+    margin-bottom: 0;
+}
+.action-buttons .form-group label {
+    display: none; /* Hide labels in the compact view */
+}
+.action-buttons input[type="text"] {
+    width: 250px;
+    padding: 0.5rem;
+}
+.action-buttons button {
+    padding: 0.5rem 1rem;
+    font-size: 0.9em;
+}
+
 
 /* --- Responsive Adjustments --- */
 @media (max-width: 1200px) {

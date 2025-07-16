@@ -152,6 +152,59 @@ async def get_images_by_tag(
     result = await db.execute(query)
     return result.scalars().all()
 
+
+async def bulk_update_images(db: AsyncSession, action_request: schemas.BulkActionRequest, utils_module) -> int:
+    """
+    Performs a bulk action on a list of image IDs.
+    Returns the number of affected images.
+    """
+    if not action_request.image_ids:
+        return 0
+
+    # Fetch all the images to be updated in a single query
+    images_query = await db.execute(
+        select(models.Image)
+        .options(selectinload(models.Image.tags)) # Eagerly load tags for modification
+        .filter(models.Image.id.in_(action_request.image_ids))
+    )
+    images_to_update = images_query.scalars().all()
+
+    # --- Perform the requested action ---
+
+    if action_request.action == 'add_tags' and isinstance(action_request.value, str):
+        tag_names_str = action_request.value
+        tag_names = [name.strip().lower() for name in tag_names_str.split(',') if name.strip()]
+        if not tag_names:
+            return 0
+        
+        tags_to_add = await get_or_create_tags_by_name(db, tag_names)
+        for image in images_to_update:
+            # Add new tags, avoiding duplicates
+            existing_image_tags = {tag.name for tag in image.tags}
+            for tag in tags_to_add:
+                if tag.name not in existing_image_tags:
+                    image.tags.append(tag)
+    
+    elif action_request.action == 'set_nsfw' and isinstance(action_request.value, bool):
+        is_nsfw_value = action_request.value
+        for image in images_to_update:
+            image.is_nsfw = is_nsfw_value
+
+    elif action_request.action == 'delete':
+        for image in images_to_update:
+            # Use the existing utility function to delete the files
+            utils_module.delete_image_files(image.filename, image.thumbnail_path)
+            # Then delete the image from the session
+            await db.delete(image)
+
+    else:
+        # If the action is unknown, do nothing
+        return 0
+        
+    # Commit all changes to the database at once
+    await db.commit()
+
+    return len(images_to_update)
 # --- Add CRUD functions for Tags and Albums later ---
 # async def create_tag(...): ...
 # async def get_tags(...): ...

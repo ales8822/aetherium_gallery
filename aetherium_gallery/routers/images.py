@@ -169,6 +169,29 @@ async def read_image_api(image_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Image not found")
     return db_image
 
+
+
+@router.post("/bulk-update", status_code=200)
+async def bulk_update_images_api(
+    action_request: schemas.BulkActionRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Performs a bulk action (e.g., add tags, set NSFW, delete)
+    on a list of specified image IDs.
+    """
+    try:
+        # Pass the 'utils' module to the CRUD function so it can call delete_image_files
+        affected_count = await crud.bulk_update_images(db, action_request, utils_module=utils)
+        return {
+            "message": f"Action '{action_request.action}' performed successfully.",
+            "images_affected": affected_count
+        }
+    except Exception as e:
+        logger.error(f"Bulk update failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred during the bulk update.")
+        
+
 @router.patch("/{image_id}", response_model=schemas.Image)
 async def update_image_api(
     image_id: int,

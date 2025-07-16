@@ -1,11 +1,12 @@
-<!-- templates/partials/gallery_grid.html (Corrected Version) -->
+<!-- templates/partials/gallery_grid.html (Final, Corrected Version with data-id) -->
 
 <div class="gallery-grid">
   {% for image in images %}
-    <div class="gallery-item">
+    <!-- ▼▼▼ THIS IS THE CRITICAL LINE THAT WAS MISSING OR INCORRECT ▼▼▼ -->
+    <div class="gallery-item" data-id="{{ image.id }}">
+    
       <!-- The Link (contains image and hover-overlay) -->
       <a href="{{ url_for('image_detail', image_id=image.id) }}" data-full-image-url="{{ url_for('uploads', path=image.filepath) }}" class="gallery-link">
-          
           {% if image.thumbnail_path %}
           <img src="{{ url_for('uploads', path=image.thumbnail_path) }}" alt="{{ image.original_filename or 'Uploaded Image' }}" loading="lazy" />
           {% else %}
@@ -16,6 +17,14 @@
               <p class="filename">{{ image.original_filename or image.filename }}</p>
           </div>
       </a>
+
+      <!-- ▼▼▼ These are the elements that show up in selection mode ▼▼▼ -->
+      <div class="selection-overlay"></div>
+      <div class="selection-checkbox">
+        <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 0 24 24" width="20px" fill="white">
+          <path d="M0 0h24v24H0V0z" fill="none"/><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+        </svg>
+      </div>
   
       <!-- CONTAINER for persistent icons -->
       <div class="persistent-icons">

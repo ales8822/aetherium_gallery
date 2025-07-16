@@ -54,10 +54,16 @@ class Image(ImageBase):
     size_bytes: Optional[int] = None
     # When displaying an image, we want a list of structured Tag objects
     tags: List[Tag] = [] # Defaults to an empty list
-    
+
     class Config:
         from_attributes = True # Pydantic V2 uses this instead of orm_mode
 
+class BulkActionRequest(BaseModel):
+    image_ids: List[int]
+    action: str  # e.g., 'add_tags', 'set_nsfw', 'delete'
+    # 'value' can be a string (for tags) or a boolean (for nsfw)
+    value: Optional[str | bool] = None
+    
 # --- Tag Schemas (Add Later) ---
 # class TagBase(BaseModel): ...
 # class TagCreate(TagBase): ...

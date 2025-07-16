@@ -18,68 +18,12 @@ block content %}
   </p>
 {% endif %}
 
+{% include 'partials/bulk_actions_panel.html' %}
 <!-- JavaScript for the Lightbox -->
 <script src="https://cdn.jsdelivr.net/npm/basiclightbox@5.0.4/dist/basicLightbox.min.js"></script>
 
 <script>
-  document.addEventListener("DOMContentLoaded", () => {
-    // Lightbox for full image view
-    const galleryLinks = document.querySelectorAll(".gallery-grid a.gallery-link");
-
-galleryLinks.forEach((link) => {
-  link.addEventListener("click", (event) => {
-    // Prevent the default navigation
-    event.preventDefault();
-
-    // --- GRAB THE DATA WE NEED ---
-    // Get the URL for the full-size image from the data-attribute
-    const fullImageUrl = link.dataset.fullImageUrl;
-    // Get the URL for the detail page directly from the link's href
-    const detailPageUrl = link.href;
-    // Find the filename text from the overlay inside the link
-    const filename = link.querySelector('.overlay .filename').textContent;
-
-
-    // --- BUILD THE NEW LIGHTBOX CONTENT ---
-    // We now create a container with the image AND our new caption/button bar
-    const contentHtml = `
-      <div class="image-lightbox-container">
-        <img src="${fullImageUrl}" style="max-width: 90vw; max-height: 85vh;">
-        <div class="lightbox-caption">
-          <span class="lightbox-filename">${filename}</span>
-          <a href="${detailPageUrl}" class="lightbox-details-button">Details & Actions</a>
-        </div>
-      </div>
-    `;
-
-    // Create and show the lightbox with our new, richer content
-    basicLightbox.create(contentHtml).show();
-  });
-});
-
-    // Lightbox for metadata info panel
-    const infoIcons = document.querySelectorAll(".info-icon");
-    infoIcons.forEach((icon) => {
-      icon.addEventListener("click", (event) => {
-        event.stopPropagation();
-        const data = icon.dataset;
-        const contentHtml = `
-            <div class="info-lightbox-content">
-                <h3>${data.filename}</h3>
-                <dl>
-                    <dt>Dimensions</dt><dd>${data.dimensions || 'N/A'}</dd>
-                    <dt>Sampler</dt><dd>${data.sampler || 'N/A'}</dd>
-                    <dt>Steps</dt><dd>${data.steps || 'N/A'}</dd>
-                    <dt>CFG Scale</dt><dd>${data.cfg || 'N/A'}</dd>
-                    ${data.prompt ? `<dt>Prompt</dt><dd class="prompt">${data.prompt}</dd>` : ''}
-                    ${data.negativePrompt ? `<dt>Negative Prompt</dt><dd class="prompt">${data.negativePrompt}</dd>` : ''}
-                </dl>
-            </div>
-        `;
-        basicLightbox.create(contentHtml).show();
-      });
-    });
-  });
+ 
 </script>
 
 {% endblock %}
