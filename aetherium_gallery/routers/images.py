@@ -40,6 +40,8 @@ async def handle_staged_image_upload(
     cfg_scale: Optional[str] = Form(None),
     seed: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
+    # This will be 'on' if checked, and None if not. We default it to False.
+    is_nsfw: Optional[str] = Form(None), 
 ):
     """
     Handles the submission from the new advanced upload form with a single
@@ -85,6 +87,8 @@ async def handle_staged_image_upload(
         except (ValueError, TypeError):
             seed_int = None
 
+        # This converts the 'on' from the checkbox to a boolean True/False
+        is_nsfw_bool = (is_nsfw == 'on')
 
         # 5. Prepare data for DB record USING THE FORM DATA
         image_data = {
@@ -105,6 +109,7 @@ async def handle_staged_image_upload(
             "steps": steps_int,
             "cfg_scale": cfg_float,
             "seed": seed_int,
+            "is_nsfw": is_nsfw_bool,
         }
 
         # 6. Create the database record

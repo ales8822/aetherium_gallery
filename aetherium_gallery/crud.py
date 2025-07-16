@@ -10,14 +10,22 @@ async def get_image(db: AsyncSession, image_id: int) -> Optional[models.Image]:
     result = await db.execute(select(models.Image).filter(models.Image.id == image_id))
     return result.scalars().first()
 
-async def get_images(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[models.Image]:
-    """Get a list of images with pagination."""
-    result = await db.execute(
-        select(models.Image)
-        .order_by(models.Image.upload_date.desc()) # Example sorting
-        .offset(skip)
-        .limit(limit)
-    )
+async def get_images(
+    db: AsyncSession, skip: int = 0, limit: int = 100, safe_mode: bool = False
+) -> List[models.Image]:
+    """
+    Get a list of images with pagination and an optional NSFW filter.
+    """
+    query = select(models.Image)
+
+    # If safe mode is on, add a filter to the query
+    if safe_mode:
+        query = query.filter(models.Image.is_nsfw == False)
+    
+    # Apply the rest of the query options
+    query = query.order_by(models.Image.upload_date.desc()).offset(skip).limit(limit)
+
+    result = await db.execute(query)
     return result.scalars().all()
 
 async def create_image(db: AsyncSession, image_data: dict) -> models.Image:

@@ -65,6 +65,10 @@
                     <input type="text" id="seed" name="seed"> <!-- Text type handles large seeds better -->
                 </div>
             </div>
+            <div class="form-group form-group-checkbox">
+                <input type="checkbox" id="is_nsfw" name="is_nsfw" value="on">
+                <label for="is_nsfw">This image is NSFW (18+)</label>
+            </div>
         </div>
     </div>
 
@@ -158,6 +162,27 @@ document.addEventListener("DOMContentLoaded", () => {
         width: 40px; height: 40px;
         animation: spin 1s linear infinite;
     }
+
+    .form-group-checkbox {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background-color: #3f3f3f;
+        padding: 0.8rem;
+        border-radius: 4px;
+        margin-top: 1rem;
+    }
+    .form-group-checkbox label {
+        margin-bottom: 0;
+        font-weight: normal;
+        color: #e0e0e0;
+        cursor: pointer;
+    }
+    .form-group-checkbox input[type="checkbox"] {
+        width: auto;
+        transform: scale(1.2);
+    }
+    
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     .form-row { display: flex; gap: 1rem; }
     .form-group { flex-grow: 1; margin-bottom: 1rem; }

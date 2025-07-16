@@ -36,7 +36,7 @@ async def init_db():
     async with engine.begin() as conn:
         logger.info("Dropping and creating all tables (for development)...")
         # In production, use Alembic for migrations instead of dropping tables
-        # await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Database tables created.")
 

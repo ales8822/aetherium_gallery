@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, Float
+from sqlalchemy import Column, Integer, String, DateTime, Text, Float,Boolean 
 from sqlalchemy.sql import func
 from .database import Base
 from datetime import datetime
@@ -30,7 +30,7 @@ class Image(Base):
     user_rating = Column(Integer, nullable=True) # e.g., 1-5 stars
     notes = Column(Text, nullable=True)
     is_favorite = Column(Integer, default=0) # 0=False, 1=True
-
+    is_nsfw = Column(Boolean, default=False, nullable=False, index=True)
     # Relationships (Add later for Tags, Albums)
     # tags = relationship("Tag", secondary="image_tags", back_populates="images")
     # album_id = Column(Integer, ForeignKey("albums.id"), nullable=True)

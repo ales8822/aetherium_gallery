@@ -1,13 +1,42 @@
+<!-- templates/base.html (Corrected Logic) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}Aetherium Gallery{% endblock %}</title>
-    <link
-      rel="stylesheet"
-      href="{{ url_for('static', path='/css/style.css') }}"
-    />
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}" />
+    
+    <!-- Styles for the toggle switch (Unchanged) -->
+    <style>
+      .safe-mode-toggle { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; user-select: none;}
+      .toggle-switch {
+        position: relative; display: inline-block;
+        width: 44px; height: 24px;
+      }
+      .toggle-switch input { opacity: 0; width: 0; height: 0; }
+      .slider {
+        position: absolute; cursor: pointer;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background-color: #555;
+        border-radius: 24px;
+        transition: .4s;
+      }
+      .slider:before {
+        position: absolute; content: "";
+        height: 18px; width: 18px;
+        left: 3px; bottom: 3px;
+        background-color: white;
+        border-radius: 50%;
+        transition: .4s;
+      }
+      /* This logic is now consistent: NOT checked = NSFW mode (red) */
+      input:not(:checked) + .slider { background-color: #e57373; }
+      /* CHECKED = SFW mode (green) */
+      input:checked + .slider { background-color: #81c784; } 
+      
+      input:checked + .slider:before { transform: translateX(20px); }
+    </style>
     {% block head_extra %}{% endblock %}
   </head>
   <body>
@@ -17,7 +46,23 @@
         <ul>
           <li><a href="{{ url_for('gallery_index') }}">Gallery</a></li>
           <li><a href="{{ url_for('upload_form') }}">Upload</a></li>
-          <!-- Add links for Tags, Albums, Search later -->
+
+          <li>
+            <label for="safe-mode-checkbox" class="safe-mode-toggle" title="Toggle Safe Mode">
+              <span>NSFW</span>
+              <div class="toggle-switch">
+                <!--
+                  ▼▼▼ LOGIC CORRECTION 1 ▼▼▼
+                  The checkbox is now CHECKED when safe_mode from the backend is true.
+                  This makes the initial state match the JavaScript's expectation.
+                -->
+                <input type="checkbox" id="safe-mode-checkbox" {% if safe_mode %}checked{% endif %}>
+                <span class="slider"></span>
+              </div>
+              <span>SFW</span>
+            </label>
+          </li>
+
         </ul>
       </nav>
     </header>
@@ -28,7 +73,31 @@
       <p>© {{ now().year }} Aetherium Gallery</p>
     </footer>
 
-    <script src="{{ url_for('static', path='/js/script.js') }}"></script>
+    <!-- Inline script block for Safe Mode -->
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const toggle = document.getElementById('safe-mode-checkbox');
+
+        if (toggle) {
+          toggle.addEventListener('change', () => {
+            /* 
+              ▼▼▼ LOGIC CORRECTION 2 ▼▼▼
+              This logic is now correct and consistent with the display.
+              - If the box IS CHECKED, it means "SFW is on", so set cookie to 'on'.
+              - If the box IS NOT CHECKED, it means "SFW is off", so set cookie to 'off'.
+            */
+            const safeModeValue = toggle.checked ? 'on' : 'off';
+            
+            // Set a cookie that expires in 30 days
+            document.cookie = `safe_mode=${safeModeValue};path=/;max-age=2592000;samesite=Lax`;
+            
+            // Reload the page to apply the filter
+            window.location.reload();
+          });
+        }
+      });
+    </script>
+    
     {% block scripts_extra %}{% endblock %}
   </body>
 </html>

@@ -70,6 +70,13 @@
                     <pre class="plain-text">{{ image.notes or 'No notes.' }}</pre>
                     <textarea name="notes" class="form-control" rows="4">{{ image.notes or '' }}</textarea>
                 </dd>
+                <dt>NSFW Status:</dt>
+                <dd>
+                    <!-- The text to show in view mode -->
+                    <span class="plain-text">{{ "Yes" if image.is_nsfw else "No" }}</span>
+                    <!-- The checkbox for edit mode -->
+                    <input name="is_nsfw" class="form-control" type="checkbox" value="on" {% if image.is_nsfw %}checked{% endif %} style="width: auto; transform: scale(1.2);">
+                </dd>
             </dl>
         </form>
 
@@ -146,7 +153,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         }
-
+        updateData['is_nsfw'] = editForm.elements['is_nsfw'].checked;
+        
         statusMessage.textContent = 'Saving...';
         statusMessage.style.color = '#e0e0e0';
 

@@ -16,17 +16,23 @@ router = APIRouter()
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 @router.get("/", response_class=HTMLResponse, name="gallery_index")
-async def read_gallery_index(request: Request, db: AsyncSession = Depends(get_db), skip: int = 0, limit: int = 50):
+async def read_gallery_index(
+    request: Request, db: AsyncSession = Depends(get_db), skip: int = 0, limit: int = 50
+):
     """Serves the main gallery page."""
-    images = await crud.get_images(db, skip=skip, limit=limit)
-    # Convert model instances to schemas suitable for template, or pass models directly if template handles it
-    # image_schemas = [schemas.Image.from_orm(img) for img in images]
+    # Check for the 'safe_mode' cookie from the user's browser
+    safe_mode_enabled = request.cookies.get("safe_mode", "off") == "on"
+
+    # Pass the flag to the CRUD function
+    images = await crud.get_images(db, skip=skip, limit=limit, safe_mode=safe_mode_enabled)
+    
     return templates.TemplateResponse("index.html", {
         "request": request,
-        "images": images, # Pass the ORM models directly
-        "upload_folder": f"/{settings.UPLOAD_FOLDER}", # Access UPLOAD_FOLDER from the settings instance
+        "images": images,
+        "upload_folder": f"/{settings.UPLOAD_FOLDER}",
         "page_title": "Aetherium Gallery",
-        "now": datetime.datetime.now, # Pass the datetime.datetime.now function
+        "now": datetime.datetime.now,
+        "safe_mode": safe_mode_enabled # Pass the status to the template
     })
 
 @router.get("/upload", response_class=HTMLResponse, name="upload_form")

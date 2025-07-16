@@ -17,6 +17,7 @@ class ImageBase(BaseModel):
     user_rating: Optional[int] = Field(None, ge=1, le=5)
     notes: Optional[str] = None
     is_favorite: Optional[bool] = False
+    is_nsfw: Optional[bool] = False
 
 class ImageCreate(ImageBase):
     # Fields required on creation might differ, but often overlap base
