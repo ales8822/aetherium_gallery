@@ -1,0 +1,22 @@
+<!-- templates/tag_gallery.html -->
+{% extends "base.html" %}
+
+{% block title %}Images tagged with "{{ tag_name }}"{% endblock %}
+
+{% block content %}
+    <h1>Images tagged with <span class="tag-highlight">{{ tag_name }}</span></h1>
+    <p class="search-summary">
+        Found <strong>{{ image_count }}</strong> images with this tag.
+    </p>
+
+    <!--
+      We reuse the exact same gallery grid display.
+      The logic is identical to index.html and search_results.html
+    -->
+    {% if images %}
+        {% include 'partials/gallery_grid.html' %}
+    {% else %}
+        <p>No images found with this tag.</p>
+    {% endif %}
+
+{% endblock %}

@@ -2,6 +2,19 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 
+
+class TagBase(BaseModel):
+    name: str
+
+class TagCreate(TagBase):
+    pass
+
+class Tag(TagBase):
+    id: int
+    
+    class Config:
+        from_attributes = True
+
 # --- Image Schemas ---
 class ImageBase(BaseModel):
     original_filename: Optional[str] = None
@@ -18,6 +31,8 @@ class ImageBase(BaseModel):
     notes: Optional[str] = None
     is_favorite: Optional[bool] = False
     is_nsfw: Optional[bool] = False
+    # ▼▼▼ ADD A FIELD FOR INCOMING TAGS (as a string) ▼▼▼
+    tags: Optional[str] = None # Will accept a comma-separated string from forms
 
 class ImageCreate(ImageBase):
     # Fields required on creation might differ, but often overlap base
@@ -37,7 +52,9 @@ class Image(ImageBase):
     upload_date: datetime
     content_type: Optional[str] = None
     size_bytes: Optional[int] = None
-
+    # When displaying an image, we want a list of structured Tag objects
+    tags: List[Tag] = [] # Defaults to an empty list
+    
     class Config:
         from_attributes = True # Pydantic V2 uses this instead of orm_mode
 

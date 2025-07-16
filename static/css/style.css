@@ -448,6 +448,16 @@ which is hidden by default.
     padding-left: 1rem;
 }
 
+/* --- Tag Gallery Page Styles --- */
+.tag-highlight {
+    background-color: #444;
+    color: #64b5f6; /* Use theme highlight color */
+    padding: 0.2rem 0.8rem;
+    border-radius: 4px;
+    font-family: monospace;
+    border: 1px solid #555;
+}
+
 footer {
   text-align: center;
   margin-top: 3rem;

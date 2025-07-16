@@ -85,4 +85,27 @@ async def search_results(
         "safe_mode": safe_mode_enabled,
     })
 
+@router.get("/tag/{tag_name}", response_class=HTMLResponse, name="tag_gallery")
+async def read_images_by_tag(
+    request: Request,
+    tag_name: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """Displays a gallery of all images for a specific tag."""
+    safe_mode_enabled = request.cookies.get("safe_mode", "off") == "on"
+
+    # Use the CRUD function we already built to fetch the images
+    images = await crud.get_images_by_tag(
+        db, tag_name=tag_name, safe_mode=safe_mode_enabled, limit=100
+    )
+
+    return templates.TemplateResponse("tag_gallery.html", {
+        "request": request,
+        "images": images,
+        "image_count": len(images),
+        "tag_name": tag_name,
+        "page_title": f"Tag: {tag_name}",
+        "now": datetime.datetime.now,
+        "safe_mode": safe_mode_enabled,
+    })
 # Add routes for viewing/managing tags and albums later

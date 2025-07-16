@@ -1,5 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+# Add this new import for optimized loading
+from sqlalchemy.orm import selectinload 
 from . import models, schemas
 from typing import List, Optional
 from sqlalchemy import or_
@@ -7,42 +9,58 @@ from sqlalchemy import or_
 # --- Image CRUD ---
 
 async def get_image(db: AsyncSession, image_id: int) -> Optional[models.Image]:
-    """Get a single image by its ID."""
-    result = await db.execute(select(models.Image).filter(models.Image.id == image_id))
+    """Get a single image by its ID, eagerly loading its tags."""
+    result = await db.execute(
+        select(models.Image)
+        .options(selectinload(models.Image.tags)) # Eagerly load tags
+        .filter(models.Image.id == image_id)
+    )
     return result.scalars().first()
 
 async def get_images(
     db: AsyncSession, skip: int = 0, limit: int = 100, safe_mode: bool = False
 ) -> List[models.Image]:
-    """
-    Get a list of images with pagination and an optional NSFW filter.
-    """
-    query = select(models.Image)
-
-    # If safe mode is on, add a filter to the query
+    """Get a list of images, eagerly loading their tags."""
+    query = select(models.Image).options(selectinload(models.Image.tags))
     if safe_mode:
         query = query.filter(models.Image.is_nsfw == False)
-    
-    # Apply the rest of the query options
     query = query.order_by(models.Image.upload_date.desc()).offset(skip).limit(limit)
-
     result = await db.execute(query)
     return result.scalars().all()
 
 async def create_image(db: AsyncSession, image_data: dict) -> models.Image:
-    """Create a new image record in the database."""
-    # Potentially use schemas.ImageCreate here for validation if needed
+    """Create a new image, processing and linking any associated tags."""
+    # Pop tags from the dict if they exist, so we can handle them separately
+    tag_names_str = image_data.pop('tags', None)
+    
+    # Create the Image object without the tags first
     db_image = models.Image(**image_data)
+
+    # If there are tags, process them
+    if tag_names_str:
+        tag_names = [name.strip().lower() for name in tag_names_str.split(',') if name.strip()]
+        tags = await get_or_create_tags_by_name(db, tag_names)
+        db_image.tags = tags # Associate the tags with the image
+
     db.add(db_image)
     await db.commit()
     await db.refresh(db_image)
     return db_image
 
 async def update_image(db: AsyncSession, db_image: models.Image, image_update: schemas.ImageUpdate) -> models.Image:
-    """Update an existing image record."""
-    update_data = image_update.model_dump(exclude_unset=True) # Pydantic V2
+    """Update an existing image record, including its tags."""
+    update_data = image_update.model_dump(exclude_unset=True)
+    
+    # Handle tags separately
+    if 'tags' in update_data:
+        tag_names_str = update_data.pop('tags')
+        tag_names = [name.strip().lower() for name in tag_names_str.split(',') if name.strip()]
+        tags = await get_or_create_tags_by_name(db, tag_names)
+        db_image.tags = tags
+
     for key, value in update_data.items():
         setattr(db_image, key, value)
+    
     db.add(db_image)
     await db.commit()
     await db.refresh(db_image)
@@ -91,6 +109,48 @@ async def search_images(
     result = await db.execute(db_query)
     return result.scalars().all()
 
+
+async def get_or_create_tags_by_name(db: AsyncSession, tag_names: List[str]) -> List[models.Tag]:
+    """
+    For a list of tag names, retrieves existing tags and creates any that don't exist.
+    """
+    # Find all existing tags in one query
+    existing_tags_query = await db.execute(select(models.Tag).where(models.Tag.name.in_(tag_names)))
+    existing_tags = existing_tags_query.scalars().all()
+    existing_tag_names = {tag.name for tag in existing_tags}
+
+    # Determine which tags are new
+    new_tag_names = [name for name in tag_names if name not in existing_tag_names]
+
+    new_tags = []
+    if new_tag_names:
+        # Create all new tags
+        new_tags = [models.Tag(name=name) for name in new_tag_names]
+        db.add_all(new_tags)
+        # We need to flush to get the IDs of the new tags if we were to return them
+        # before the final commit, but we can let the main function commit.
+
+    return existing_tags + new_tags
+
+async def get_images_by_tag(
+    db: AsyncSession, tag_name: str, safe_mode: bool = False, skip: int = 0, limit: int = 100
+) -> List[models.Image]:
+    """
+    Get all images associated with a specific tag name.
+    """
+    query = (
+        select(models.Image)
+        .options(selectinload(models.Image.tags))
+        .join(models.Image.tags)
+        .filter(models.Tag.name == tag_name)
+    )
+    if safe_mode:
+        query = query.filter(models.Image.is_nsfw == False)
+    
+    query = query.order_by(models.Image.upload_date.desc()).offset(skip).limit(limit)
+    
+    result = await db.execute(query)
+    return result.scalars().all()
 
 # --- Add CRUD functions for Tags and Albums later ---
 # async def create_tag(...): ...
