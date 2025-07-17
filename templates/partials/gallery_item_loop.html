@@ -9,9 +9,7 @@
   -->
   <div 
     class="gallery-item" 
-    data-id="{{ image.id }}" 
-    style="--span-size: {{ ( (280 / image.aspect_ratio if image.aspect_ratio and image.aspect_ratio > 0 else 280) + 16 ) | round | int }};"
-  >
+    data-id="{{ image.id }}" >
     <!-- The rest of the content remains the same -->
     <a href="{{ url_for('image_detail', image_id=image.id) }}" data-full-image-url="{{ url_for('uploads', path=image.filepath) }}" class="gallery-link">
         {% if image.thumbnail_path %}
