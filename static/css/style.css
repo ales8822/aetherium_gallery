@@ -546,12 +546,6 @@ footer {
     display: block; /* Show checkmark icon */
 }
 
-/* Disable links and other icons in selection mode to prevent navigating away */
-.selection-mode-active .gallery-link,
-.selection-mode-active .persistent-icons {
-    /* pointer-events: none; */
-}
-
 
 /* --- Bulk Actions Panel Styles --- */
 .bulk-actions-panel {
@@ -608,6 +602,53 @@ footer {
     font-size: 0.9em;
 }
 
+
+
+/* --- Click-to-Copy Styles for Image Detail Page --- */
+
+.metadata-field-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Space between the text and the copy button */
+    word-break: break-all; /* Allow long words to break */
+}
+
+/* Style for the copy button */
+.copy-button {
+    background-color: #3f3f3f;
+    border: 1px solid #555;
+    color: #e0e0e0;
+    font-size: 0.8em;
+    padding: 0.3rem 0.6rem;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap; /* Prevent "Copy" from wrapping */
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+    flex-shrink: 0; /* Prevent the button from shrinking */
+    
+    /* Initially hide in edit mode */
+    display: flex; /* Use flex for button content like icon + text */
+    align-items: center;
+    gap: 4px;
+}
+
+.copy-button:hover {
+    background-color: #64b5f6;
+    border-color: #64b5f6;
+    color: #111;
+}
+
+/* Style for the copy icon (if you choose to use an SVG icon instead of text) */
+.copy-button svg {
+    fill: currentColor; /* Use the text color for the icon */
+    width: 14px;
+    height: 14px;
+}
+
+/* Make sure copy buttons are hidden when in edit mode */
+.metadata-editor.edit-mode .copy-button {
+    display: none;
+}
 
 /* --- Responsive Adjustments --- */
 @media (max-width: 1200px) {

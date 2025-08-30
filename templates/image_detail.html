@@ -47,48 +47,197 @@
 
         <form id="edit-form">
             <dl>
-                <!-- Static fields... -->
-                <dt>Filename:</dt> <dd>{{ image.filename }}</dd>
-                <!-- ... other static fields ... -->
-                <dt>Content Type:</dt> <dd>{{ image.content_type or 'N/A' }}</dd>
+    <!-- Static fields that are not editable -->
+    <dt>Filename:</dt> 
+    <dd>
+        <div class="metadata-field-wrapper">
+            <span class="copy-target">{{ image.filename }}</span>
+            <button class="copy-button" type="button" title="Copy Filename">
+                <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
+                    <path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                </svg>
+            </button>
+        </div>
+    </dd>
+    <dt>Original Filename:</dt> 
+    <dd>
+        <div class="metadata-field-wrapper">
+            <span class="copy-target">{{ image.original_filename or 'N/A' }}</span>
+            <button class="copy-button" type="button" title="Copy Original Filename">
+                <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
+                    <path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                </svg>
+            </button>
+        </div>
+    </dd>
+    <dt>Uploaded:</dt> 
+    <dd>
+        <div class="metadata-field-wrapper">
+            <span class="copy-target">{{ image.upload_date.strftime('%Y-%m-%d %H:%M:%S') if image.upload_date else 'N/A' }}</span>
+            <button class="copy-button" type="button" title="Copy Upload Date">
+                <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
+                    <path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                </svg>
+            </button>
+        </div>
+    </dd>
+    <dt>Dimensions:</dt> 
+    <dd>
+        <div class="metadata-field-wrapper">
+            <span class="copy-target">{{ image.width }}x{{ image.height }}</span>
+            <button class="copy-button" type="button" title="Copy Dimensions">
+                <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
+                    <path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                </svg>
+            </button>
+        </div>
+    </dd>
+    <dt>Size:</dt> 
+    <dd>
+        <div class="metadata-field-wrapper">
+            <span class="copy-target">{{ "%.2f"|format(image.size_bytes / 1024 / 1024) if image.size_bytes else 'N/A' }} MB</span>
+            <button class="copy-button" type="button" title="Copy Size">
+                <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
+                    <path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                </svg>
+            </button>
+        </div>
+    </dd>
+    <dt>Content Type:</dt> 
+    <dd>
+        <div class="metadata-field-wrapper">
+            <span class="copy-target">{{ image.content_type or 'N/A' }}</span>
+            <button class="copy-button" type="button" title="Copy Content Type">
+                <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
+                    <path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                </svg>
+            </button>
+        </div>
+    </dd>
 
-                <!-- Editable Fields Below -->
-                
-                <!-- ▼▼▼ NEW: TAGS DISPLAY AND EDITOR ▼▼▼ -->
-                <dt>Tags:</dt>
-                <dd>
-                    <div class="plain-text">
-                        {% if image.tags %}
-                            <ul class="tag-list">
-                            {% for tag in image.tags %}
-                                <li><a href="{{ url_for('tag_gallery', tag_name=tag.name) }}">{{ tag.name }}</a></li>
-                            {% endfor %}
-                            </ul>
-                        {% else %}
-                            <span>No tags assigned.</span>
-                        {% endif %}
-                    </div>
-                    <!-- 
-                      This input shows the tags as a comma-separated string for editing.
-                      The 'join' filter in Jinja2 is perfect for this.
-                    -->
-                    <input type="text" name="tags" class="form-control" value="{{ image.tags | map(attribute='name') | join(', ') }}">
-                </dd>
+    <!-- Editable Fields Below -->
 
-                <!-- ... all other editable fields for prompt, steps, etc. ... -->
+    <dt>Tags:</dt>
+    <dd>
+        <div class="plain-text metadata-field-wrapper">
+            {% if image.tags %}
+                <ul class="tag-list">
+                {% for tag in image.tags %}
+                    <li><a href="{{ url_for('tag_gallery', tag_name=tag.name) }}">{{ tag.name }}</a></li>
+                {% endfor %}
+                </ul>
+            {% else %}
+                <span class="copy-target">No tags assigned.</span>
+                <button class="copy-button" type="button" title="Copy Tags (empty)">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
+                        <path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                    </svg>
+                </button>
+            {% endif %}
+        </div>
+        <input type="text" name="tags" class="form-control" value="{{ image.tags | map(attribute='name') | join(', ') }}">
+    </dd>
 
-                <dt>Notes:</dt>
-                <dd>
-                    <pre class="plain-text">{{ image.notes or 'No notes.' }}</pre>
-                    <textarea name="notes" class="form-control" rows="4">{{ image.notes or '' }}</textarea>
-                </dd>
-                
-                <dt>NSFW Status:</dt>
-                <dd>
-                    <span class="plain-text">{{ "Yes" if image.is_nsfw else "No" }}</span>
-                    <input name="is_nsfw" class="form-control" type="checkbox" {% if image.is_nsfw %}checked{% endif %} style="width: auto; transform: scale(1.2);">
-                </dd>
-            </dl>
+    <dt>Prompt:</dt>
+    <dd>
+        <pre class="plain-text copy-target">{{ image.prompt or 'N/A' }}</pre>
+        <button class="copy-button" type="button" title="Copy Prompt">
+            <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
+                <path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+            </svg>
+        </button>
+        <textarea name="prompt" class="form-control" rows="5">{{ image.prompt or '' }}</textarea>
+    </dd>
+
+    <dt>Negative Prompt:</dt>
+    <dd>
+        <pre class="plain-text copy-target">{{ image.negative_prompt or 'N/A' }}</pre>
+        <button class="copy-button" type="button" title="Copy Negative Prompt">
+            <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
+                <path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+            </svg>
+        </button>
+        <textarea name="negative_prompt" class="form-control" rows="3">{{ image.negative_prompt or '' }}</textarea>
+    </dd>
+
+    <dt>Seed:</dt>
+    <dd>
+        <div class="metadata-field-wrapper">
+            <span class="plain-text copy-target">{{ image.seed if image.seed is not none else 'N/A' }}</span>
+            <button class="copy-button" type="button" title="Copy Seed">
+                <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
+                    <path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                </svg>
+            </button>
+        </div>
+        <input type="text" name="seed" class="form-control" value="{{ image.seed or '' }}">
+    </dd>
+    
+    <dt>Steps:</dt>
+    <dd>
+        <div class="metadata-field-wrapper">
+            <span class="plain-text copy-target">{{ image.steps if image.steps is not none else 'N/A' }}</span>
+            <button class="copy-button" type="button" title="Copy Steps">
+                <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
+                    <path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                </svg>
+            </button>
+        </div>
+        <input type="number" name="steps" class="form-control" value="{{ image.steps or '' }}">
+    </dd>
+
+    <dt>CFG Scale:</dt>
+    <dd>
+        <div class="metadata-field-wrapper">
+            <span class="plain-text copy-target">{{ image.cfg_scale if image.cfg_scale is not none else 'N/A' }}</span>
+            <button class="copy-button" type="button" title="Copy CFG Scale">
+                <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
+                    <path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                </svg>
+            </button>
+        </div>
+        <input type="number" step="0.1" name="cfg_scale" class="form-control" value="{{ image.cfg_scale or '' }}">
+    </dd>
+
+    <dt>Sampler:</dt>
+    <dd>
+        <div class="metadata-field-wrapper">
+            <span class="plain-text copy-target">{{ image.sampler or 'N/A' }}</span>
+            <button class="copy-button" type="button" title="Copy Sampler">
+                <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
+                    <path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                </svg>
+            </button>
+        </div>
+        <input type="text" name="sampler" class="form-control" value="{{ image.sampler or '' }}">
+    </dd>
+
+    <dt>Notes:</dt>
+    <dd>
+        <div class="plain-text">
+            <pre class="copy-target">{{ image.notes or 'No notes.' }}</pre>
+            <button class="copy-button" type="button" title="Copy Notes">
+                <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
+                    <path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                </svg>
+            </button>
+        </div>
+        <textarea name="notes" class="form-control" rows="4">{{ image.notes or '' }}</textarea>
+    </dd>
+    
+    <dt>NSFW Status:</dt>
+    <dd>
+        <div class="metadata-field-wrapper">
+            <span class="plain-text copy-target">{{ "Yes" if image.is_nsfw else "No" }}</span>
+            <button class="copy-button" type="button" title="Copy NSFW Status">
+                <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
+                    <path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                </svg>
+            </button>
+        </div>
+        <input name="is_nsfw" class="form-control" type="checkbox" {% if image.is_nsfw %}checked{% endif %} style="width: auto; transform: scale(1.2);">
+    </dd>
+</dl>
         </form>
 
         <div class="actions">
@@ -126,6 +275,40 @@ document.addEventListener('DOMContentLoaded', function () {
     saveButton.addEventListener('click', saveChanges);
 
     // --- Functions ---
+
+    // --- Click-to-Copy Functionality ---
+    editorPanel.addEventListener('click', function (event) {
+        // Find the closest copy button that was clicked
+        const copyButton = event.target.closest('.copy-button');
+        
+        // If the click wasn't on a copy button, do nothing.
+        if (!copyButton) {
+            return;
+        }
+
+        // Find the sibling or parent element with the text to be copied
+        const wrapper = copyButton.closest('dd');
+        const targetElement = wrapper.querySelector('.copy-target');
+        
+        if (targetElement) {
+            const textToCopy = targetElement.innerText || targetElement.textContent;
+            
+            navigator.clipboard.writeText(textToCopy)
+                .then(() => {
+                    // Provide visual feedback
+                    const originalText = copyButton.innerHTML;
+                    copyButton.innerHTML = 'Copied!';
+                    setTimeout(() => {
+                        copyButton.innerHTML = originalText;
+                    }, 1500); // Revert back after 1.5 seconds
+                })
+                .catch(err => {
+                    console.error('Failed to copy text: ', err);
+                    alert('Failed to copy text.');
+                });
+        }
+    });
+    
     function enterEditMode() {
         editorPanel.classList.add('edit-mode');
     }
