@@ -1,4 +1,4 @@
-<!-- templates/partials/bulk_actions_panel.html -->
+<!-- templates/partials/bulk_actions_panel.html (New Version) -->
 <div id="bulk-actions-panel" class="bulk-actions-panel">
     <div class="selection-count">
         <span id="selected-count">0</span> images selected
@@ -7,14 +7,25 @@
     <div class="action-buttons">
         <!-- Add Tags -->
         <div class="form-group">
-            <input type="text" id="bulk-add-tags" placeholder="Add tags, e.g. sci-fi, character">
+            <input type="text" id="bulk-add-tags" placeholder="Add tags...">
         </div>
         <button type="button" id="bulk-action-add-tags">Add Tags</button>
         
-        <!-- Mark as NSFW -->
-        <button type="button" id="bulk-action-set-nsfw">Mark as NSFW</button>
+        <!-- ▼▼▼ ADD ALBUM DROPDOWN AND BUTTON ▼▼▼ -->
+        <div class="form-group">
+            <select id="bulk-add-to-album">
+                <option value="null">(Remove from Album)</option>
+                {% if albums %}
+                    {% for album in albums %}
+                    <option value="{{ album.id }}">{{ album.name }}</option>
+                    {% endfor %}
+                {% endif %}
+            </select>
+        </div>
+        <button type="button" id="bulk-action-add-to-album">Set Album</button>
 
-        <!-- Delete Selected -->
-        <button type="button" id="bulk-action-delete" class="delete-button">Delete Selected</button>
+        <!-- Other Actions -->
+        <button type="button" id="bulk-action-set-nsfw">Mark as NSFW</button>
+        <button type="button" id="bulk-action-delete" class="delete-button">Delete</button>
     </div>
 </div>

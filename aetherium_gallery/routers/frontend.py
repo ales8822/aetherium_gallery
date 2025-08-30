@@ -26,10 +26,12 @@ async def read_gallery_index(
 
     # Pass the flag to the CRUD function
     images = await crud.get_images(db, skip=skip, limit=limit, safe_mode=safe_mode_enabled)
-    
+    albums = await crud.get_all_albums(db)
+
     return templates.TemplateResponse("index.html", {
         "request": request,
         "images": images,
+        "albums": albums,
         "upload_folder": f"/{settings.UPLOAD_FOLDER}",
         "page_title": "Aetherium Gallery",
         "now": datetime.datetime.now,
@@ -37,10 +39,15 @@ async def read_gallery_index(
     })
 
 @router.get("/upload", response_class=HTMLResponse, name="upload_form")
-async def show_upload_form(request: Request):
+async def show_upload_form(request: Request, db: AsyncSession = Depends(get_db)):
     """Serves the image upload form page."""
+    # Fetch all albums to populate the dropdown
+    albums_with_counts = await crud.get_all_albums(db)
+    # Extract just the album objects from the tuples
+    albums = [album for album, count in albums_with_counts]
     return templates.TemplateResponse("upload.html", {
         "request": request,
+         "albums": albums,
         "page_title": "Upload Image",
         "now": datetime.datetime.now, # Pass it here as well if your upload form uses the footer
     })
@@ -51,10 +58,13 @@ async def read_image_detail(request: Request, image_id: int, db: AsyncSession = 
     db_image = await crud.get_image(db, image_id=image_id)
     if db_image is None:
         raise HTTPException(status_code=404, detail="Image not found")
-    # image_schema = schemas.Image.from_orm(db_image)
+    # Fetch all albums to populate the editor's dropdown menu
+    all_albums_with_counts = await crud.get_all_albums(db)
+    all_albums = [album for album, count in all_albums_with_counts]
     return templates.TemplateResponse("image_detail.html", {
         "request": request,
         "image": db_image, # Pass ORM model directly
+        "all_albums": all_albums,
         "upload_folder": f"/{settings.UPLOAD_FOLDER}", # Access UPLOAD_FOLDER from the settings instance
         "page_title": f"Image - {db_image.original_filename or db_image.filename}",
         "now": datetime.datetime.now, # Pass it here too
@@ -74,10 +84,12 @@ async def search_results(
     if q:
         # Call our new CRUD function
         images = await crud.search_images(db, query=q, safe_mode=safe_mode_enabled, limit=100)
+        albums = await crud.get_all_albums(db)
 
     return templates.TemplateResponse("search_results.html", {
         "request": request,
         "images": images,
+        "albums": albums,
         "image_count": len(images),
         "search_query": q,
         "page_title": f"Search results for '{q}'",
@@ -98,10 +110,12 @@ async def read_images_by_tag(
     images = await crud.get_images_by_tag(
         db, tag_name=tag_name, safe_mode=safe_mode_enabled, limit=100
     )
+    albums = await crud.get_all_albums(db)
 
     return templates.TemplateResponse("tag_gallery.html", {
         "request": request,
         "images": images,
+        "albums": albums,
         "image_count": len(images),
         "tag_name": tag_name,
         "page_title": f"Tag: {tag_name}",

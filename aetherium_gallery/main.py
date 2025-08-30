@@ -21,7 +21,7 @@ import logging
 
 from .config import settings, BASE_DIR
 from .database import init_db
-from .routers import frontend, images # Import router modules
+from .routers import frontend, images, albums# Import router modules
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -52,7 +52,7 @@ app.mount(f"/{settings.UPLOAD_FOLDER}", StaticFiles(directory=settings.UPLOAD_PA
 app.include_router(frontend.router)
 app.include_router(images.upload_router) # User-facing upload endpoint
 app.include_router(images.router) # API endpoints under /api/images
-
+app.include_router(albums.router)
 
 # --- Basic Error Handling (Example) ---
 @app.exception_handler(Exception)

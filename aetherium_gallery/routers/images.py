@@ -42,7 +42,8 @@ async def handle_staged_image_upload(
     notes: Optional[str] = Form(None),
     # This will be 'on' if checked, and None if not. We default it to False.
     is_nsfw: Optional[str] = Form(None), 
-    tags: Optional[str] = Form(None)
+    tags: Optional[str] = Form(None),
+    album_id: Optional[str] = Form(None)
 ):
     """
     Handles the submission from the new advanced upload form with a single
@@ -88,6 +89,11 @@ async def handle_staged_image_upload(
         except (ValueError, TypeError):
             seed_int = None
 
+        try:
+            album_id_int = int(album_id) if album_id else None
+        except (ValueError, TypeError):
+            album_id_int = None
+
         # This converts the 'on' from the checkbox to a boolean True/False
         is_nsfw_bool = (is_nsfw == 'on')
 
@@ -112,6 +118,7 @@ async def handle_staged_image_upload(
             "seed": seed_int,
             "is_nsfw": is_nsfw_bool,
             "tags": tags,
+            "album_id": album_id_int
         }
 
         # 6. Create the database record

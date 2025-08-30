@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<h1>{{ album.name }}</h1>
+<p class="album-description">{{ album.description or "No description provided for this album."}}</p>
+<p class="search-summary">
+    Displaying <strong>{{ image_count }}</strong> images.
+</p>
+
+{% if images %}
+    {% include 'partials/gallery_grid.html' %}
+{% else %}
+    <p>This album is currently empty. You can add images using the 'Select' tool in the main gallery.</p>
+{% endif %}
+
+{% include 'partials/bulk_actions_panel.html' %}
+
+{% endblock %}

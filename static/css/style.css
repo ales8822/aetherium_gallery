@@ -650,6 +650,81 @@ footer {
     display: none;
 }
 
+
+/* static/css/style.css (Add before @media queries) */
+
+/* --- Album Page Styles --- */
+
+.header-with-action {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #555;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.header-with-action h1 {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+/* Style for the create button to distinguish from standard form buttons */
+a.button {
+    background-color: #4CAF50; /* A green color for "Create" */
+    color: white;
+    padding: 0.6rem 1.2rem;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: background-color 0.2s ease;
+}
+a.button:hover {
+    background-color: #45a049;
+}
+
+ul.album-list {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+ul.album-list li a {
+    display: block;
+    background-color: #252525;
+    padding: 1.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #e0e0e0;
+    border: 1px solid #444;
+    transition: all 0.2s ease-in-out;
+}
+
+ul.album-list li a:hover {
+    transform: translateY(-5px);
+    border-color: #64b5f6;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+ul.album-list h2 {
+    margin-top: 0;
+    border-bottom: none;
+    color: #64b5f6;
+}
+.image-count-badge {
+    display: inline-block;
+    margin-top: 1rem;
+    background-color: #3f3f3f;
+    color: #ccc;
+    font-size: 0.8em;
+    font-weight: bold;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+}
+
+
 /* --- Responsive Adjustments --- */
 @media (max-width: 1200px) {
   .gallery-grid {

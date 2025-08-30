@@ -45,6 +45,7 @@
         <a href="{{ url_for('gallery_index') }}">Aetherium Gallery</a>
         <ul>
           <li><a href="{{ url_for('gallery_index') }}">Gallery</a></li>
+          <li><a href="{{ url_for('list_albums') }}">Albums</a></li>
           <li><a href="{{ url_for('upload_form') }}">Upload</a></li>
 
           <li>
@@ -122,6 +123,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Action Panel Elements
     const bulkAddTagsInput = document.getElementById('bulk-add-tags');
     const bulkAddTagsButton = document.getElementById('bulk-action-add-tags');
+    const bulkAddToAlbumSelect = document.getElementById('bulk-add-to-album');
+    const bulkAddToAlbumButton = document.getElementById('bulk-action-add-to-album');
     const bulkSetNsfwButton = document.getElementById('bulk-action-set-nsfw');
     const bulkDeleteButton = document.getElementById('bulk-action-delete');
     
@@ -145,6 +148,13 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 alert('Please enter tags to add.');
             }
+        });
+    }
+     if (bulkAddToAlbumButton) {
+        bulkAddToAlbumButton.addEventListener('click', () => {
+            const albumId = bulkAddToAlbumSelect.value;
+            // The value is 'null' (a string) if we selected the "remove" option
+            performBulkAction('add_to_album', albumId === 'null' ? null : parseInt(albumId));
         });
     }
     if (bulkSetNsfwButton) {
@@ -205,8 +215,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // If the action was delete, or tags were added, we should reload the page
             // to accurately reflect the new state of the gallery.
-            if (action === 'delete' || action === 'add_tags' || action === 'set_nsfw') {
-                window.location.reload();
+           if (action === 'delete' || action === 'add_tags' || action === 'set_nsfw' || action === 'add_to_album') {
+            window.location.reload();
             } else {
                 // For other actions, we could potentially just exit selection mode
                 toggleSelectionMode(); 

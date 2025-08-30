@@ -33,6 +33,7 @@ class ImageBase(BaseModel):
     is_nsfw: Optional[bool] = False
     # ▼▼▼ ADD A FIELD FOR INCOMING TAGS (as a string) ▼▼▼
     tags: Optional[str] = None # Will accept a comma-separated string from forms
+    album_id: Optional[int] = None
 
 class ImageCreate(ImageBase):
     # Fields required on creation might differ, but often overlap base
@@ -54,7 +55,9 @@ class Image(ImageBase):
     size_bytes: Optional[int] = None
     # When displaying an image, we want a list of structured Tag objects
     tags: List[Tag] = [] # Defaults to an empty list
-
+    # ▼▼▼ ADD A FORWARD REFERENCE TO THE ALBUM SCHEMA ▼▼▼
+    # This will be populated later
+    album: Optional['AlbumInfo'] = None
     class Config:
         from_attributes = True # Pydantic V2 uses this instead of orm_mode
 
@@ -63,13 +66,31 @@ class BulkActionRequest(BaseModel):
     action: str  # e.g., 'add_tags', 'set_nsfw', 'delete'
     # 'value' can be a string (for tags) or a boolean (for nsfw)
     value: Optional[str | bool] = None
-    
-# --- Tag Schemas (Add Later) ---
-# class TagBase(BaseModel): ...
-# class TagCreate(TagBase): ...
-# class Tag(TagBase): ...
 
-# --- Album Schemas (Add Later) ---
-# class AlbumBase(BaseModel): ...
-# class AlbumCreate(AlbumBase): ...
-# class Album(AlbumBase): ...
+class AlbumBase(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = None
+
+class AlbumCreate(AlbumBase):
+    pass
+
+class AlbumUpdate(AlbumBase):
+    pass
+
+# A simplified schema for nesting inside the Image schema
+class AlbumInfo(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        from_attributes = True
+
+# The full Album schema for detail pages
+class Album(AlbumBase):
+    id: int
+    created_date: datetime
+    images: List[Image] = [] # Show all images when viewing a single album
+
+    class Config:
+        from_attributes = True
+    

@@ -1,0 +1,29 @@
+<!-- templates/albums/album_list.html (Corrected) -->
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="header-with-action">
+    <h1>All Albums</h1>
+    <a href="{{ url_for('create_album_form') }}" class="button">Create New Album</a>
+</div>
+
+{% if albums_with_counts %}
+    <ul class="album-list">
+        <!-- ▼▼▼ The loop variable has changed ▼▼▼ -->
+        {% for album, image_count in albums_with_counts %}
+        <li>
+            <a href="{{ url_for('view_album', album_id=album.id) }}">
+                <h2>{{ album.name }}</h2>
+                <p>{{ album.description or 'No description.' }}</p>
+                <!-- ▼▼▼ We can now safely display the count ▼▼▼ -->
+                <span class="image-count-badge">{{ image_count }} image{% if image_count != 1 %}s{% endif %}</span>
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p>No albums have been created yet. <a href="{{ url_for('create_album_form') }}">Create one now!</a></p>
+{% endif %}
+{% endblock %}

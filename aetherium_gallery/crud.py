@@ -1,18 +1,23 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-# Add this new import for optimized loading
-from sqlalchemy.orm import selectinload 
+from sqlalchemy.orm import selectinload
+from sqlalchemy import or_, func # This is the ONLY import we need for SQL functions
+
 from . import models, schemas
 from typing import List, Optional
-from sqlalchemy import or_
+
 
 # --- Image CRUD ---
 
 async def get_image(db: AsyncSession, image_id: int) -> Optional[models.Image]:
-    """Get a single image by its ID, eagerly loading its tags."""
+    """Get a single image by its ID, eagerly loading its tags and album."""
     result = await db.execute(
         select(models.Image)
-        .options(selectinload(models.Image.tags)) # Eagerly load tags
+        # Chain another options() call to load the album
+        .options(
+            selectinload(models.Image.tags),
+            selectinload(models.Image.album) # Eagerly load the album relationship
+        )
         .filter(models.Image.id == image_id)
     )
     return result.scalars().first()
@@ -190,6 +195,15 @@ async def bulk_update_images(db: AsyncSession, action_request: schemas.BulkActio
         for image in images_to_update:
             image.is_nsfw = is_nsfw_value
 
+    elif action_request.action == 'add_to_album':
+        # The 'value' should be the integer ID of the album
+        try:
+            album_id = int(action_request.value) if action_request.value is not None else None
+            for image in images_to_update:
+                image.album_id = album_id # Set or unset the album_id
+        except (ValueError, TypeError):
+            return 0 # Do nothing if the album ID is invalid
+
     elif action_request.action == 'delete':
         for image in images_to_update:
             # Use the existing utility function to delete the files
@@ -205,10 +219,55 @@ async def bulk_update_images(db: AsyncSession, action_request: schemas.BulkActio
     await db.commit()
 
     return len(images_to_update)
-# --- Add CRUD functions for Tags and Albums later ---
-# async def create_tag(...): ...
-# async def get_tags(...): ...
-# async def create_album(...): ...
-# async def get_albums(...): ...
-# async def add_image_to_album(...): ...
-# async def assign_tag_to_image(...): ...
+
+# --- Album CRUD ---
+
+async def get_album(db: AsyncSession, album_id: int) -> Optional[models.Album]:
+    """Get a single album by its ID, eagerly loading its images and their tags."""
+    result = await db.execute(
+        select(models.Album)
+        .options(selectinload(models.Album.images).selectinload(models.Image.tags))
+        .filter(models.Album.id == album_id)
+    )
+    return result.scalars().first()
+
+async def get_all_albums(db: AsyncSession) -> List:
+    """
+    Get a list of all albums, including a count of images in each.
+    Returns a list of tuples (Album, image_count).
+    """
+    # Create a subquery to count images per album
+    image_count_subquery = (
+        select(models.Image.album_id, func.count(models.Image.id).label("image_count"))
+        .group_by(models.Image.album_id)
+        .subquery()
+    )
+
+    query = (
+        # Use func.coalesce, just like func.count
+        select(models.Album, func.coalesce(image_count_subquery.c.image_count, 0))
+        .outerjoin(
+            image_count_subquery, models.Album.id == image_count_subquery.c.album_id
+        )
+        .order_by(models.Album.name)
+    )
+
+    result = await db.execute(query)
+    return result.all()
+    
+async def create_album(db: AsyncSession, album: schemas.AlbumCreate) -> models.Album:
+    """Create a new album."""
+    db_album = models.Album(name=album.name, description=album.description)
+    db.add(db_album)
+    await db.commit()
+    await db.refresh(db_album)
+    return db_album
+
+async def delete_album(db: AsyncSession, album_id: int) -> Optional[models.Album]:
+    """Deletes an album. Images within the album will have their album_id set to null."""
+    db_album = await get_album(db, album_id=album_id)
+    if db_album:
+        await db.delete(db_album)
+        await db.commit()
+        return db_album
+    return None
