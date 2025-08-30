@@ -184,10 +184,20 @@ h2 {
 /* --- Other Page Styles --- */
 
 .image-detail-container {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 2rem;
-  align-items: start;
+  max-width: 1200px;
+  margin: 0 auto; /* Center the container on the page */
+}
+
+.image-view {
+    margin-bottom: 2rem; /* Add some space between the image and the panel below it */
+    text-align: center; /* Center the image within the view */
+}
+
+.image-view img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px; /* Give the image slightly rounded corners */
+    background-color: #303030;
 }
 
 .metadata-panel, .info-lightbox-content {
@@ -408,7 +418,6 @@ which is hidden by default.
 */
 .edit-actions {
     display: none;
-    margin-top: 1rem;
     gap: 1rem; /* Creates space between Save and Cancel buttons */
 }
 
@@ -724,6 +733,42 @@ ul.album-list h2 {
     border-radius: 12px;
 }
 
+/* --- Updated Image Detail Panel Styles --- */
+.panel-header {
+    display: flex;
+    justify-content: end; /* This pushes the title left and actions right*/
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+
+.actions {
+    display: flex;
+    gap: 1rem; /* Puts space between Edit and Delete buttons */
+    align-items: center;
+  
+}
+.actions > * {
+    display: flex;
+    align-items: center;
+    gap: 1rem; /* This will now control the space between Save and Cancel too */
+}
+
+/* Make sure the form for the delete button doesn't add extra margins */
+.actions form {
+    margin: 0;
+    padding: 0;
+}
+
+/* A slightly different style for the cancel button */
+button.cancel-button {
+    background-color: #555;
+    color: #e0e0e0;
+}
+button.cancel-button:hover {
+    background-color: #666;
+}
+
 
 /* --- Responsive Adjustments --- */
 @media (max-width: 1200px) {
@@ -736,6 +781,7 @@ ul.album-list h2 {
     column-count: 3;
   }
 }
+
 @media (max-width: 768px) {
   .gallery-grid {
     column-count: 2;
