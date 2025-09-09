@@ -15,9 +15,9 @@
             <!-- IMPORTANT: The 'name' must match your FastAPI endpoint parameter -->
             <input type="file" id="image-upload" name="file" accept="image/png, image/jpeg, image/webp, video/mp4, video/webm" required class="file-input">
             
+            <!-- templates/upload.html (NEW PREVIEW CONTAINER) -->
             <div id="preview-container" class="preview-container">
-                <img id="image-preview" src="#" alt="Image Preview" class="image-preview" />
-                <div id="preview-text" class="preview-text">Select an image to see a preview</div>
+                <div id="preview-text" class="preview-text">Select an image or video to see a preview</div>
                 <div id="loading-spinner" class="loading-spinner" style="display: none;">
                     <div class="spinner"></div>
                     Extracting Metadata...
@@ -104,34 +104,59 @@ document.addEventListener("DOMContentLoaded", () => {
     const submitButton = document.getElementById("submit-button");
     const form = document.getElementById("upload-form");
 
-    uploadInput.addEventListener("change", (event) => {
+     uploadInput.addEventListener("change", (event) => {
         const file = event.target.files[0];
         if (!file) {
             submitButton.disabled = true;
             return;
         }
 
-        // --- Show the preview instantly ---
+        // --- DYNAMIC PREVIEW GENERATION (CORRECTED) ---
         const objectURL = URL.createObjectURL(file);
-        previewImage.src = objectURL; // The poster image can be set from the video's first frame
-        previewImage.style.display = 'block';
+        
+        // Find and remove any OLD media preview element if one exists
+        const existingPreview = previewContainer.querySelector('.media-preview');
+        if (existingPreview) {
+            existingPreview.remove();
+        }
+        
+        // Hide the initial "Select an image..." text
         previewText.style.display = 'none';
 
-        // Set the filename field immediately
-        form.elements['original_filename'].value = file.name;
+        let mediaElement;
+        if (file.type.startsWith('image/')) {
+            // If it's an image, create an <img> element
+            mediaElement = document.createElement('img');
+            mediaElement.src = objectURL;
+            mediaElement.alt = 'Image Preview';
 
-        // --- NEW LOGIC: Check if the file is an image or video ---
-        
-        // If it's NOT an image, we can't extract metadata.
-        if (!file.type.startsWith('image/')) {
-            console.log("Video selected. Skipping metadata extraction.");
-            // We can optionally show a video player in the preview
-            // For now, the poster image is enough. Just enable the button.
-            submitButton.disabled = false;
-            return; // Exit the function here.
+        } else if (file.type.startsWith('video/')) {
+            // If it's a video, create a <video> element
+            mediaElement = document.createElement('video');
+            mediaElement.src = objectURL;
+            mediaElement.autoplay = true;
+            mediaElement.muted = true;
+            mediaElement.loop = true;
+            mediaElement.playsInline = true;
         }
 
-        // If it IS an image, proceed with fetching the metadata as before.
+        if(mediaElement) {
+            mediaElement.className = 'media-preview';
+            // Insert the new media element BEFORE the spinner
+            previewContainer.insertBefore(mediaElement, loadingSpinner);
+        }
+
+        form.elements['original_filename'].value = file.name;
+
+        // --- Metadata logic ---
+        
+        // If it's a video, we don't extract metadata. Just enable the button.
+        if (!file.type.startsWith('image/')) {
+            submitButton.disabled = false;
+            return; // Exit here.
+        }
+
+        // If it IS an image, show spinner and fetch metadata.
         loadingSpinner.style.display = 'flex';
         submitButton.disabled = true;
         const formData = new FormData();
@@ -150,7 +175,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 form.elements['cfg_scale'].value = data.cfg_scale || '';
                 form.elements['seed'].value = data.seed || '';
                 
-                loadingSpinner.style.display = 'none';
+                // Hide the spinner and enable submission
+                loadingSpinner.style.display = 'none'; // <-- THIS NOW WORKS RELIABLY
                 submitButton.disabled = false;
             })
             .catch(error => {
@@ -174,7 +200,7 @@ document.addEventListener("DOMContentLoaded", () => {
         display: flex; justify-content: center; align-items: center;
         position: relative; overflow: hidden; background-color: #252525;
     }
-    .image-preview { display: none; width: 100%; height: 100%; object-fit: contain; }
+    /* .image-preview { display: none; width: 100%; height: 100%; object-fit: contain; } */
     .preview-text { color: #888; }
     .loading-spinner {
         position: absolute; top: 0; left: 0; right: 0; bottom: 0;

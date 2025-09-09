@@ -787,6 +787,12 @@ button.cancel-button:hover {
     filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
 }
 
+.media-preview {
+    /* This will apply to both the <img> and <video> elements we create */
+    width: 100%;
+    height: 100%;
+    object-fit: contain; /* Scales the content to fit inside the container without stretching */
+}
 
 /* --- Responsive Adjustments --- */
 @media (max-width: 1200px) {
