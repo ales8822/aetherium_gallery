@@ -16,7 +16,8 @@ async def get_image(db: AsyncSession, image_id: int) -> Optional[models.Image]:
         # Chain another options() call to load the album
         .options(
             selectinload(models.Image.tags),
-            selectinload(models.Image.album) # Eagerly load the album relationship
+            selectinload(models.Image.album), # Eagerly load the album relationship
+            selectinload(models.Image.video_source)
         )
         .filter(models.Image.id == image_id)
     )
@@ -26,7 +27,10 @@ async def get_images(
     db: AsyncSession, skip: int = 0, limit: int = 100, safe_mode: bool = False
 ) -> List[models.Image]:
     """Get a list of images, eagerly loading their tags."""
-    query = select(models.Image).options(selectinload(models.Image.tags))
+    query = select(models.Image).options(
+        selectinload(models.Image.tags),
+        selectinload(models.Image.video_source) # Eagerly load video source
+    )
     if safe_mode:
         query = query.filter(models.Image.is_nsfw == False)
     query = query.order_by(models.Image.upload_date.desc()).offset(skip).limit(limit)
@@ -103,6 +107,7 @@ async def search_images(
             models.Image.original_filename.ilike(search_term),
         )
     )
+    db_query = db_query.options(selectinload(models.Image.video_source))
 
     # Apply the safe mode filter if it's enabled
     if safe_mode:
@@ -145,7 +150,10 @@ async def get_images_by_tag(
     """
     query = (
         select(models.Image)
-        .options(selectinload(models.Image.tags))
+        .options(
+            selectinload(models.Image.tags),
+            selectinload(models.Image.video_source)
+         ) # Eagerly load video source)
         .join(models.Image.tags)
         .filter(models.Tag.name == tag_name)
     )
@@ -226,7 +234,7 @@ async def get_album(db: AsyncSession, album_id: int) -> Optional[models.Album]:
     """Get a single album by its ID, eagerly loading its images and their tags."""
     result = await db.execute(
         select(models.Album)
-        .options(selectinload(models.Album.images).selectinload(models.Image.tags))
+        .options(selectinload(models.Album.images).selectinload(models.Image.tags).selectinload(models.Image.video_source)) # Eager load image's video)
         .filter(models.Album.id == album_id)
     )
     return result.scalars().first()
@@ -271,3 +279,13 @@ async def delete_album(db: AsyncSession, album_id: int) -> Optional[models.Album
         await db.commit()
         return db_album
     return None
+
+# --- Video CRUD ---
+
+async def create_video_source(db: AsyncSession, video_data: dict) -> models.VideoSource:
+    """Create a new video source record in the database."""
+    db_video_source = models.VideoSource(**video_data)
+    db.add(db_video_source)
+    await db.commit()
+    await db.refresh(db_video_source)
+    return db_video_source

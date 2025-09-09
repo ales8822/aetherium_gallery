@@ -120,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const selectedCountSpan = document.getElementById('selected-count');
     const galleryGrid = document.querySelector('.gallery-grid');
 
-    // Action Panel Elements
+    // --- Action Panel Elements ---
     const bulkAddTagsInput = document.getElementById('bulk-add-tags');
     const bulkAddTagsButton = document.getElementById('bulk-action-add-tags');
     const bulkAddToAlbumSelect = document.getElementById('bulk-add-to-album');
@@ -139,107 +139,92 @@ document.addEventListener('DOMContentLoaded', () => {
     if (galleryGrid) {
         galleryGrid.addEventListener('click', handleGalleryClick);
     }
-    // ▼▼▼ NEW: ACTION BUTTON LISTENERS ▼▼▼
-    if (bulkAddTagsButton) {
-        bulkAddTagsButton.addEventListener('click', () => {
-            const tags = bulkAddTagsInput.value.trim();
-            if (tags) {
-                performBulkAction('add_tags', tags);
-            } else {
-                alert('Please enter tags to add.');
-            }
-        });
-    }
-     if (bulkAddToAlbumButton) {
-        bulkAddToAlbumButton.addEventListener('click', () => {
-            const albumId = bulkAddToAlbumSelect.value;
-            // The value is 'null' (a string) if we selected the "remove" option
-            performBulkAction('add_to_album', albumId === 'null' ? null : parseInt(albumId));
-        });
-    }
-    if (bulkSetNsfwButton) {
-        bulkSetNsfwButton.addEventListener('click', () => {
-             // We can expand this later to set SFW/NSFW. For now, it just sets to NSFW=true
-            performBulkAction('set_nsfw', true);
-        });
-    }
-    if (bulkDeleteButton) {
-        bulkDeleteButton.addEventListener('click', () => {
-            if (confirm(`Are you sure you want to delete ${selectedImageIds.size} selected images? This cannot be undone.`)) {
-                performBulkAction('delete');
-            }
-        });
-    }
+    // Action Button Listeners
+    if (bulkAddTagsButton) { /* ... listener code ... */ }
+    if (bulkAddToAlbumButton) { /* ... listener code ... */ }
+    if (bulkSetNsfwButton) { /* ... listener code ... */ }
+    if (bulkDeleteButton) { /* ... listener code ... */ }
 
-    // --- CORE UI FUNCTIONS ---
-    // (These functions are unchanged from the last step)
+    // --- MASTER CLICK HANDLER ---
+    function handleGalleryClick(event) {
+        const clickedItem = event.target.closest('.gallery-item');
+        if (!clickedItem) return;
+
+        // --- Selection Mode Logic ---
+        if (isSelectionMode) {
+            event.preventDefault();
+            event.stopPropagation();
+            const imageId = parseInt(clickedItem.dataset.id, 10);
+            if (!imageId) return;
+            toggleItemSelection(clickedItem, imageId);
+            updateActionsPanel();
+            return;
+        }
+        
+        // --- Normal Mode Logic ---
+        const galleryLink = event.target.closest('.gallery-link');
+        const infoIcon = event.target.closest('.info-icon');
+
+        if (infoIcon) {
+            event.preventDefault();
+            event.stopPropagation();
+            showInfoLightbox(infoIcon);
+            return;
+        }
+        
+        if (galleryLink) {
+            event.preventDefault();
+            showImageLightbox(galleryLink);
+        }
+    }
+    
+    // --- UI HELPER FUNCTIONS ---
+    // (These functions are all complete from previous steps)
     function toggleSelectionMode() { /* ... */ }
-    function handleGalleryClick(event) { /* ... */ }
     function toggleItemSelection(item, id) { /* ... */ }
     function updateActionsPanel() { /* ... */ }
     function clearSelection() { /* ... */ }
-    function showImageLightbox(linkElement) { /* ... */ }
-    function showInfoLightbox(iconElement) { /* ... */ }
+    
+    // --- LIGHTBOX FUNCTIONS (FROM YOUR INDEX.HTML) ---
+    function showImageLightbox(linkElement) {
+        const mediaUrl = linkElement.dataset.fullImageUrl;
+        const detailPageUrl = linkElement.href;
+        const filename = linkElement.querySelector('.overlay .filename').textContent;
+        const isVideo = linkElement.dataset.isVideo === 'true';
+        const videoType = linkElement.dataset.videoType;
+        let mediaHtml;
 
-    // ▼▼▼ THE NEW, FINAL FUNCTION THAT TALKS TO THE BACKEND ▼▼▼
-    async function performBulkAction(action, value = null) {
-        const ids = Array.from(selectedImageIds); // Convert Set to Array for JSON
-        if (ids.length === 0) {
-            alert("No images selected.");
-            return;
+        if (isVideo) {
+            mediaHtml = `<video controls autoplay muted loop playsinline style="max-width: 90vw; max-height: 85vh; display: block;"><source src="${mediaUrl}" type="${videoType}"></video>`;
+        } else {
+            mediaHtml = `<img src="${mediaUrl}" style="max-width: 90vw; max-height: 85vh;">`;
         }
 
-        const body = {
-            image_ids: ids,
-            action: action,
-            value: value,
-        };
-
-        try {
-            // Show feedback to the user
-            document.body.style.cursor = 'wait';
-            
-            const response = await fetch('/api/images/bulk-update', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'An unknown error occurred.');
-            }
-
-            const result = await response.json();
-            alert(`Success: ${result.message}`);
-
-            // If the action was delete, or tags were added, we should reload the page
-            // to accurately reflect the new state of the gallery.
-           if (action === 'delete' || action === 'add_tags' || action === 'set_nsfw' || action === 'add_to_album') {
-            window.location.reload();
-            } else {
-                // For other actions, we could potentially just exit selection mode
-                toggleSelectionMode(); 
-            }
-
-        } catch (error) {
-            console.error('Bulk action failed:', error);
-            alert(`Error: ${error.message}`);
-        } finally {
-            // Always restore the cursor
-            document.body.style.cursor = 'default';
-        }
+        const contentHtml = `<div class="image-lightbox-container">${mediaHtml}<div class="lightbox-caption"><span class="lightbox-filename">${filename}</span><a href="${detailPageUrl}" class="lightbox-details-button">Details & Actions</a></div></div>`;
+        basicLightbox.create(contentHtml).show();
     }
 
+    function showInfoLightbox(iconElement) {
+        const data = iconElement.dataset;
+        const contentHtml = `<div class="info-lightbox-content"><h3>${data.filename}</h3><dl><dt>Dimensions</dt><dd>${data.dimensions || 'N/A'}</dd><dt>Sampler</dt><dd>${data.sampler || 'N/A'}</dd><dt>Steps</dt><dd>${data.steps || 'N/A'}</dd><dt>CFG Scale</dt><dd>${data.cfg || 'N/A'}</dd>${data.prompt ? `<dt>Prompt</dt><dd class="prompt">${data.prompt}</dd>` : ''}${data.negativePrompt ? `<dt>Negative Prompt</dt><dd class="prompt">${data.negativePrompt}</dd>` : ''}</dl></div>`;
+        basicLightbox.create(contentHtml).show();
+    }
 
-    /* -- Re-paste the existing function bodies here to ensure they are complete -- */
+    // --- BULK ACTION API FUNCTION ---
+    async function performBulkAction(action, value = null) {
+        // ... (This function is complete from previous steps)
+    }
+
+    /* Paste in full function bodies here for clarity */
     function toggleSelectionMode() {isSelectionMode = !isSelectionMode; document.body.classList.toggle('selection-mode-active', isSelectionMode); selectModeButton.classList.toggle('active', isSelectionMode); selectModeButton.textContent = isSelectionMode ? 'Cancel Selection' : 'Select'; if (!isSelectionMode) { clearSelection(); }}
-    function handleGalleryClick(event) {const clickedItem = event.target.closest('.gallery-item'); if (!clickedItem) { return; } if (isSelectionMode) { event.preventDefault(); event.stopPropagation(); const imageId = parseInt(clickedItem.dataset.id, 10); if (!imageId) return; toggleItemSelection(clickedItem, imageId); updateActionsPanel(); return; } if (event.target.closest('.info-icon')) { event.preventDefault(); event.stopPropagation(); showInfoLightbox(event.target.closest('.info-icon')); return; } const galleryLink = event.target.closest('.gallery-link'); if (galleryLink) { event.preventDefault(); showImageLightbox(galleryLink); }}
     function toggleItemSelection(item, id) {if (selectedImageIds.has(id)) {selectedImageIds.delete(id); item.classList.remove('selected');} else {selectedImageIds.add(id); item.classList.add('selected');}}
-    function updateActionsPanel() {const count = selectedImageIds.size; selectedCountSpan.textContent = count; bulkActionsPanel.classList.toggle('visible', count > 0);}
+    function updateActionsPanel() {const count = selectedImageIds.size; if (selectedCountSpan) selectedCountSpan.textContent = count; if (bulkActionsPanel) bulkActionsPanel.classList.toggle('visible', count > 0);}
     function clearSelection() {document.querySelectorAll('.gallery-item.selected').forEach(item => item.classList.remove('selected')); selectedImageIds.clear(); updateActionsPanel();}
-    function showImageLightbox(linkElement) {const fullImageUrl = linkElement.dataset.fullImageUrl; const detailPageUrl = linkElement.href; const filename = linkElement.querySelector('.overlay .filename').textContent; const contentHtml = `<div class="image-lightbox-container"><img src="${fullImageUrl}" style="max-width: 90vw; max-height: 85vh;"><div class="lightbox-caption"><span class="lightbox-filename">${filename}</span><a href="${detailPageUrl}" class="lightbox-details-button">Details & Actions</a></div></div>`; basicLightbox.create(contentHtml).show();}
-    function showInfoLightbox(iconElement) {const data = iconElement.dataset; const contentHtml = `<div class="info-lightbox-content"><h3>${data.filename}</h3><dl><dt>Dimensions</dt><dd>${data.dimensions || 'N/A'}</dd><dt>Sampler</dt><dd>${data.sampler || 'N/A'}</dd><dt>Steps</dt><dd>${data.steps || 'N/A'}</dd><dt>CFG Scale</dt><dd>${data.cfg || 'N/A'}</dd>${data.prompt ? `<dt>Prompt</dt><dd class="prompt">${data.prompt}</dd>` : ''}${data.negativePrompt ? `<dt>Negative Prompt</dt><dd class="prompt">${data.negativePrompt}</dd>` : ''}</dl></div>`; basicLightbox.create(contentHtml).show();}
+    async function performBulkAction(action, value = null) { const ids = Array.from(selectedImageIds); if (ids.length === 0) return; const body = { image_ids: ids, action: action, value: value }; document.body.style.cursor = 'wait'; try { const response = await fetch('/api/images/bulk-update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), }); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.detail || 'An unknown error occurred.'); } const result = await response.json(); alert(`Success: ${result.message}`); window.location.reload(); } catch (error) { console.error('Bulk action failed:', error); alert(`Error: ${error.message}`); } finally { document.body.style.cursor = 'default'; }}
+    if (bulkAddTagsButton) { bulkAddTagsButton.addEventListener('click', () => { const tags = bulkAddTagsInput.value.trim(); if (tags) performBulkAction('add_tags', tags); else alert('Please enter tags to add.'); }); }
+    if (bulkAddToAlbumButton) { bulkAddToAlbumButton.addEventListener('click', () => { const albumId = bulkAddToAlbumSelect.value; performBulkAction('add_to_album', albumId === 'null' ? null : parseInt(albumId)); }); }
+    if (bulkSetNsfwButton) { bulkSetNsfwButton.addEventListener('click', () => performBulkAction('set_nsfw', true)); }
+    if (bulkDeleteButton) { bulkDeleteButton.addEventListener('click', () => { if (confirm(`Are you sure you want to delete ${selectedImageIds.size} selected images? This cannot be undone.`)) { performBulkAction('delete'); } }); }
 });
 </script>
 {% endblock %}

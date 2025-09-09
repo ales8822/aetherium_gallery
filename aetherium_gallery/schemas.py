@@ -15,6 +15,26 @@ class Tag(TagBase):
     class Config:
         from_attributes = True
 
+# --- Video Schemas ---
+class VideoSourceBase(BaseModel):
+    filename: str
+    filepath: str
+    content_type: Optional[str] = None
+    size_bytes: Optional[int] = None
+    duration: Optional[float] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+
+class VideoSourceCreate(VideoSourceBase):
+    pass
+
+class VideoSource(VideoSourceBase):
+    id: int
+    
+    class Config:
+        from_attributes = True
+
+
 # --- Image Schemas ---
 class ImageBase(BaseModel):
     original_filename: Optional[str] = None
@@ -34,6 +54,7 @@ class ImageBase(BaseModel):
     # ▼▼▼ ADD A FIELD FOR INCOMING TAGS (as a string) ▼▼▼
     tags: Optional[str] = None # Will accept a comma-separated string from forms
     album_id: Optional[int] = None
+
 
 class ImageCreate(ImageBase):
     # Fields required on creation might differ, but often overlap base
@@ -58,6 +79,7 @@ class Image(ImageBase):
     # ▼▼▼ ADD A FORWARD REFERENCE TO THE ALBUM SCHEMA ▼▼▼
     # This will be populated later
     album: Optional['AlbumInfo'] = None
+    video_source: Optional[VideoSource] = None
     class Config:
         from_attributes = True # Pydantic V2 uses this instead of orm_mode
 

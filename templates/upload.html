@@ -13,7 +13,7 @@
         <!-- Column 1: File Input & Preview -->
         <div class="upload-col-preview">
             <!-- IMPORTANT: The 'name' must match your FastAPI endpoint parameter -->
-            <input type="file" id="image-upload" name="file" accept="image/png, image/jpeg, image/webp" required class="file-input">
+            <input type="file" id="image-upload" name="file" accept="image/png, image/jpeg, image/webp, video/mp4, video/webm" required class="file-input">
             
             <div id="preview-container" class="preview-container">
                 <img id="image-preview" src="#" alt="Image Preview" class="image-preview" />
@@ -111,14 +111,29 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        // Part 1: Show image preview instantly
-        previewImage.src = URL.createObjectURL(file);
+        // --- Show the preview instantly ---
+        const objectURL = URL.createObjectURL(file);
+        previewImage.src = objectURL; // The poster image can be set from the video's first frame
         previewImage.style.display = 'block';
         previewText.style.display = 'none';
 
-        // Part 2: Fetch metadata
+        // Set the filename field immediately
+        form.elements['original_filename'].value = file.name;
+
+        // --- NEW LOGIC: Check if the file is an image or video ---
+        
+        // If it's NOT an image, we can't extract metadata.
+        if (!file.type.startsWith('image/')) {
+            console.log("Video selected. Skipping metadata extraction.");
+            // We can optionally show a video player in the preview
+            // For now, the poster image is enough. Just enable the button.
+            submitButton.disabled = false;
+            return; // Exit the function here.
+        }
+
+        // If it IS an image, proceed with fetching the metadata as before.
         loadingSpinner.style.display = 'flex';
-        submitButton.disabled = true; // Disable until metadata is loaded
+        submitButton.disabled = true;
         const formData = new FormData();
         formData.append("file", file);
 
@@ -128,8 +143,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 return response.json();
             })
             .then(data => {
-                // Part 3: Populate the form
-                form.elements['original_filename'].value = file.name;
                 form.elements['prompt'].value = data.prompt || '';
                 form.elements['negative_prompt'].value = data.negative_prompt || '';
                 form.elements['steps'].value = data.steps || '';
@@ -138,14 +151,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 form.elements['seed'].value = data.seed || '';
                 
                 loadingSpinner.style.display = 'none';
-                submitButton.disabled = false; // Enable submission
+                submitButton.disabled = false;
             })
             .catch(error => {
                 console.error("Metadata extraction failed:", error);
                 alert(`Could not get metadata: ${error.message}. You can still upload manually.`);
-                form.elements['original_filename'].value = file.name; // At least set the filename
                 loadingSpinner.style.display = 'none';
-                submitButton.disabled = false; // Enable submission even if metadata fails
+                submitButton.disabled = false;
             });
     });
 });

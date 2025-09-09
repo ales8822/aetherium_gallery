@@ -82,6 +82,34 @@ class Image(Base):
     
     # Many-to-Many relationship to Tags
     tags = relationship("Tag", secondary=image_tags_association, back_populates="images", lazy="selectin")
+    # This is the key: an Image post can now point to a VideoSource record.
+    video_source_id = Column(Integer, ForeignKey("video_sources.id"), nullable=True, index=True)
+    video_source = relationship("VideoSource", back_populates="image_entry")
 
     def __repr__(self):
         return f"<Image(id={self.id}, filename='{self.filename}')>"
+
+
+
+class VideoSource(Base):
+    __tablename__ = "video_sources"
+
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # File properties
+    filename = Column(String, unique=True, nullable=False)
+    filepath = Column(String, nullable=False)
+    content_type = Column(String, nullable=True)
+    size_bytes = Column(Integer, nullable=True)
+
+    # Video-specific metadata
+    duration = Column(Float, nullable=True)
+    width = Column(Integer, nullable=True)
+    height = Column(Integer, nullable=True)
+    
+    # This defines the "one-to-one" relationship back to the Image model.
+    # A single video file is represented by a single gallery entry.
+    image_entry = relationship("Image", back_populates="video_source", uselist=False)
+
+    def __repr__(self):
+        return f"<VideoSource(id={self.id}, filename='{self.filename}')>"

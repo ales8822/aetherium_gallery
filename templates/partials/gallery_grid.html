@@ -1,54 +1,5 @@
 <!-- templates/partials/gallery_grid.html (Final, Corrected Version with data-id) -->
 
 <div class="gallery-grid">
-  {% for image in images %}
-    <!-- ▼▼▼ THIS IS THE CRITICAL LINE THAT WAS MISSING OR INCORRECT ▼▼▼ -->
-    <div class="gallery-item" data-id="{{ image.id }}">
-    
-      <!-- The Link (contains image and hover-overlay) -->
-      <a href="{{ url_for('image_detail', image_id=image.id) }}" data-full-image-url="{{ url_for('uploads', path=image.filepath) }}" class="gallery-link">
-          {% if image.thumbnail_path %}
-          <img src="{{ url_for('uploads', path=image.thumbnail_path) }}" alt="{{ image.original_filename or 'Uploaded Image' }}" loading="lazy" />
-          {% else %}
-          <img src="{{ url_for('uploads', path=image.filepath) }}" alt="{{ image.original_filename or 'Uploaded Image' }}" loading="lazy" />
-          {% endif %}
-      
-          <div class="overlay">
-              <p class="filename">{{ image.original_filename or image.filename }}</p>
-          </div>
-      </a>
-
-      <!-- ▼▼▼ These are the elements that show up in selection mode ▼▼▼ -->
-      <div class="selection-overlay"></div>
-      <div class="selection-checkbox">
-        <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 0 24 24" width="20px" fill="white">
-          <path d="M0 0h24v24H0V0z" fill="none"/><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
-        </svg>
-      </div>
-  
-      <!-- CONTAINER for persistent icons -->
-      <div class="persistent-icons">
-          <!-- Resolution -->
-          {% if image.width and image.height %}
-          <div class="image-resolution">
-              <span>{{ image.width }}x{{ image.height }}</span>
-          </div>
-          {% endif %}
-          <!-- Info Icon -->
-          <div class="info-icon"
-               role="button"
-               aria-label="Show image metadata"
-               data-filename="{{ image.original_filename or image.filename }}"
-               data-prompt="{{ image.prompt or '' }}"
-               data-negative-prompt="{{ image.negative_prompt or '' }}"
-               data-sampler="{{ image.sampler or 'N/A' }}"
-               data-steps="{{ image.steps or 'N/A' }}"
-               data-cfg="{{ image.cfg_scale or 'N/A' }}">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" width="18px" height="18px">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
-              </svg>
-          </div>
-      </div>
-    </div>
-  {% endfor %}
+  {% include 'partials/gallery_item_loop.html' %}
 </div>

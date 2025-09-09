@@ -13,6 +13,7 @@ from ..database import get_db
 from ..config import settings
 from pathlib import Path
 
+
 router = APIRouter(
     prefix="/api/images", # Prefix for API-specific routes
     tags=["Images API"],   # Tag for API documentation
@@ -27,112 +28,124 @@ logger = logging.getLogger(__name__)
 # --- User-Facing Upload Endpoint (part of the web UI flow) ---
 
 @upload_router.post("/upload-staged", response_class=RedirectResponse, name="handle_staged_upload")
-async def handle_staged_image_upload(
+async def handle_staged_upload(
     request: Request,
     db: AsyncSession = Depends(get_db),
     file: UploadFile = File(...),
     original_filename: str = Form(...),
     prompt: Optional[str] = Form(None),
     negative_prompt: Optional[str] = Form(None),
-    # ▼▼▼ CHANGE 1: Accept problematic fields as Optional[str] ▼▼▼
     steps: Optional[str] = Form(None),
     sampler: Optional[str] = Form(None),
     cfg_scale: Optional[str] = Form(None),
     seed: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
-    # This will be 'on' if checked, and None if not. We default it to False.
     is_nsfw: Optional[str] = Form(None), 
     tags: Optional[str] = Form(None),
     album_id: Optional[str] = Form(None)
 ):
     """
-    Handles the submission from the new advanced upload form with a single
-    image and its potentially user-edited metadata.
+    Handles a staged upload of a single file, which can be an IMAGE or a VIDEO.
     """
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="Uploaded file is not a valid image.")
+    content_type = file.content_type
+    if not (content_type.startswith("image/") or content_type.startswith("video/")):
+        raise HTTPException(status_code=400, detail=f"Unsupported file type: {content_type}")
 
-    logger.info(f"Processing staged upload: {original_filename}")
+    logger.info(f"Processing staged upload for '{original_filename}' of type '{content_type}'")
+    
+    # --- Prepare common data (from form) ---
+    filename_stem, extension, safe_filename = utils.generate_safe_filename(original_filename)
+    
+    # Safely convert form data
     try:
-        # We read the file content into memory once to be used by multiple functions
-        content = await file.read()
-        file_bytes_io = io.BytesIO(content)
-
-        # 1. Generate unique filename
-        filename_stem, extension, safe_filename = utils.generate_safe_filename(original_filename)
-
-        # 2. Save the image from the in-memory bytes
-        saved_path = utils.save_uploaded_image(file_bytes_io, safe_filename)
-
-        # 3. Generate a thumbnail from the in-memory bytes
-        file_bytes_io.seek(0) # Reset the "cursor" of the in-memory file
-        thumbnail_filename = utils.generate_thumbnail(file_bytes_io, filename_stem, extension)
+        steps_int = int(steps) if steps and steps.isdigit() else None
+        cfg_float = float(cfg_scale) if cfg_scale else None
+        seed_int = int(seed) if seed and seed.isdigit() else None
+        album_id_int = int(album_id) if album_id and album_id.isdigit() else None
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Invalid numeric form data provided.")
         
-        # 4. Get image dimensions (re-opening the saved file is most reliable)
-        with PILImage.open(saved_path) as img:
-            width, height = img.size
+    is_nsfw_bool = (is_nsfw == 'on')
+
+    # This will hold the final data to be saved in the Image table
+    image_data = {}
+
+    try:
+        # --- Handle VIDEO Files ---
+        if content_type.startswith("video/"):
+            # 1. Save video file to disk first
+            video_path = utils.save_uploaded_file(file.file, safe_filename)
+
+            # 2. Process video: get metadata and generate a thumbnail
+            video_meta, thumbnail_filename = utils.process_video_file(video_path, filename_stem)
+
+            # 3. Create the VideoSource DB record
+            video_source_data = {
+                "filename": safe_filename,
+                "filepath": safe_filename,
+                "content_type": content_type,
+                "size_bytes": video_path.stat().st_size,
+                **video_meta # Unpack width, height, duration
+            }
+            video_source_obj = await crud.create_video_source(db, video_data=video_source_data)
             
-        # ▼▼▼ CHANGE 2: Manually convert the string values to numbers inside the function ▼▼▼
-        # This gives us full control over empty strings.
-        try:
-            steps_int = int(steps) if steps else None
-        except (ValueError, TypeError):
-            steps_int = None
+            # 4. Prepare data for the main Image record
+            image_data = {
+                "width": video_meta.get('width'),
+                "height": video_meta.get('height'),
+                "aspect_ratio": video_meta.get('width') / video_meta.get('height') if video_meta.get('height') > 0 else 0,
+                "video_source_id": video_source_obj.id, # Link to the video source!
+            }
             
-        try:
-            cfg_float = float(cfg_scale) if cfg_scale else None
-        except (ValueError, TypeError):
-            cfg_float = None
+        # --- Handle IMAGE Files ---
+        else: # Assumed image/
+            content = await file.read()
+            file_bytes_io = io.BytesIO(content)
 
-        try:
-            seed_int = int(seed) if seed and seed.isdigit() else None
-        except (ValueError, TypeError):
-            seed_int = None
+            saved_path = utils.save_uploaded_file(file_bytes_io, safe_filename)
+            file_bytes_io.seek(0)
+            thumbnail_filename = utils.generate_thumbnail(file_bytes_io, filename_stem, ".jpg") # Standardize thumb extension
 
-        try:
-            album_id_int = int(album_id) if album_id else None
-        except (ValueError, TypeError):
-            album_id_int = None
+            image_meta = utils.parse_metadata_from_image(saved_path)
+            
+            image_data = {
+                "width": image_meta.get('width'),
+                "height": image_meta.get('height'),
+                "aspect_ratio": image_meta.get('width') / image_meta.get('height') if image_meta.get('height', 0) > 0 else 0,
+                "size_bytes": len(content),
+            }
 
-        # This converts the 'on' from the checkbox to a boolean True/False
-        is_nsfw_bool = (is_nsfw == 'on')
-
-        # 5. Prepare data for DB record USING THE FORM DATA
-        image_data = {
+        # --- Populate and Save the final Image record ---
+        final_image_data = {
             "filename": safe_filename,
             "original_filename": original_filename,
             "filepath": safe_filename,
             "thumbnail_path": thumbnail_filename,
-            "content_type": file.content_type,
-            "size_bytes": len(content),
-            "width": width,
-            "height": height,
-            # Use the data from the form fields
+            "content_type": content_type,
             "prompt": prompt,
             "negative_prompt": negative_prompt,
             "sampler": sampler,
             "notes": notes,
-            # Use our safely converted values
             "steps": steps_int,
             "cfg_scale": cfg_float,
             "seed": seed_int,
             "is_nsfw": is_nsfw_bool,
             "tags": tags,
-            "album_id": album_id_int
+            "album_id": album_id_int,
+            **image_data # Add the image/video specific data
         }
-
-        # 6. Create the database record
-        await crud.create_image(db=db, image_data=image_data)
-        logger.info(f"Successfully processed staged upload: {original_filename} as {safe_filename}")
+        
+        await crud.create_image(db, image_data=final_image_data)
+        logger.info(f"Successfully processed and created entry for: {original_filename}")
 
     except Exception as e:
-        logger.error(f"Failed to process staged file {original_filename}: {e}", exc_info=True)
+        logger.error(f"Failed to process file {original_filename}: {e}", exc_info=True)
+        # We should ideally show an error message to the user here
+        raise HTTPException(status_code=500, detail=f"Failed to process file: {str(e)}")
     finally:
         await file.close()
 
-    gallery_url = request.url_for('gallery_index')
-    return RedirectResponse(url=gallery_url, status_code=303)
-
+    return RedirectResponse(url=request.url_for('gallery_index'), status_code=303)
 
 @router.post("/extract-metadata", summary="Extract metadata from an uploaded image")
 async def extract_metadata_from_image(file: UploadFile = File(...)):
@@ -140,6 +153,9 @@ async def extract_metadata_from_image(file: UploadFile = File(...)):
     Accepts an image file, extracts metadata using Pillow, and returns it.
     This does not save the image or create any database records.
     """
+     # Only images have extractable metadata for now
+    if not file.content_type.startswith("image/"):
+        return {"prompt": "", "notes": "Metadata extraction is only available for images."}
     # This logic can be moved to a `utils.py` function if you prefer
     try:
         # Since Pillow might need to re-read the stream, we load it into memory
@@ -235,3 +251,77 @@ async def delete_image_api(image_id: int, request: Request, db: AsyncSession = D
     # Redirect back to the gallery
     gallery_url = request.url_for('gallery_index')
     return RedirectResponse(url=gallery_url, status_code=303) # Use 303 See Other for POST redirect
+
+
+
+def save_uploaded_file(file, filename: str) -> Path:
+    """
+    Saves any uploaded file (image or video) content to the designated path.
+    Handles both FastAPI UploadFile objects and in-memory BytesIO objects.
+    """
+    file_path = settings.UPLOAD_PATH / filename
+    try:
+        if hasattr(file, 'file'):
+            # It's an UploadFile, reset cursor and read
+            file.file.seek(0)
+            content = file.file.read()
+        else:
+            # It's a file-like object (BytesIO), reset cursor and read
+            file.seek(0)
+            content = file.read()
+
+        with open(file_path, "wb") as buffer:
+            buffer.write(content)
+        
+        logger.info(f"Saved uploaded file to: {file_path}")
+        return file_path
+    except Exception as e:
+        logger.error(f"Error saving file {filename}: {e}", exc_info=True)
+        # Clean up partial file on error
+        if file_path.exists():
+            try:
+                os.remove(file_path)
+            except OSError:
+                pass
+        raise
+
+def process_video_file(video_path: Path, filename_stem: str) -> (dict, str):
+    """
+    Uses FFmpeg to extract metadata and a thumbnail from a video.
+    Returns a dictionary of metadata and the thumbnail filename.
+    """
+    logger.info(f"Processing video file: {video_path}")
+    thumbnail_filename = f"{filename_stem}_thumb.jpg" # Always save video thumbs as jpg
+    thumbnail_filepath = settings.UPLOAD_PATH / thumbnail_filename
+    
+    try:
+        # Probe for video metadata
+        probe = ffmpeg.probe(str(video_path))
+        video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
+        if video_stream is None:
+            raise RuntimeError("No video stream found in the file.")
+
+        metadata = {
+            "width": int(video_stream['width']),
+            "height": int(video_stream['height']),
+            "duration": float(video_stream['duration']),
+        }
+        
+        # Extract the first frame as a thumbnail
+        (
+            ffmpeg
+            .input(str(video_path), ss=0) # Seek to the beginning
+            .output(str(thumbnail_filepath), vframes=1) # Output one frame
+            .overwrite_output()
+            .run(capture_stdout=True, capture_stderr=True)
+        )
+        logger.info(f"Generated video thumbnail: {thumbnail_filepath}")
+        
+        return metadata, thumbnail_filename
+        
+    except ffmpeg.Error as e:
+        logger.error(f"FFmpeg error processing {video_path}: {e.stderr.decode()}")
+        raise  # Re-raise the exception to be handled by the route
+    except Exception as e:
+        logger.error(f"General error processing video {video_path}: {e}")
+        raise

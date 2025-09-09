@@ -769,6 +769,24 @@ button.cancel-button:hover {
     background-color: #666;
 }
 
+/* --- Video Indicator Styles --- */
+.video-indicator-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: rgba(0,0,0,0.3);
+    color: white;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+    pointer-events: none; /* Let clicks pass through */
+}
+
+.video-indicator-overlay svg {
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+
 
 /* --- Responsive Adjustments --- */
 @media (max-width: 1200px) {

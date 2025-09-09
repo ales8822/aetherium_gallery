@@ -8,6 +8,8 @@ from typing import Optional, Dict, Tuple # Import Optional (and Dict/Tuple which
 import logging
 import re
 import io
+import ffmpeg 
+
 logger = logging.getLogger(__name__)
 
 THUMBNAIL_SIZE = (256, 256) # Width, Height
@@ -145,7 +147,77 @@ def parse_metadata_from_image(image_source) -> dict:
 
     return metadata
 
+def save_uploaded_file(file, filename: str) -> Path:
+    """
+    Saves any uploaded file (image or video) content to the designated path.
+    Handles both FastAPI UploadFile objects and in-memory BytesIO objects.
+    """
+    file_path = settings.UPLOAD_PATH / filename
+    try:
+        if hasattr(file, 'file'):
+            # It's an UploadFile, reset cursor and read
+            file.file.seek(0)
+            content = file.file.read()
+        else:
+            # It's a file-like object (BytesIO), reset cursor and read
+            file.seek(0)
+            content = file.read()
 
+        with open(file_path, "wb") as buffer:
+            buffer.write(content)
+        
+        logger.info(f"Saved uploaded file to: {file_path}")
+        return file_path
+    except Exception as e:
+        logger.error(f"Error saving file {filename}: {e}", exc_info=True)
+        # Clean up partial file on error
+        if file_path.exists():
+            try:
+                os.remove(file_path)
+            except OSError:
+                pass
+        raise
+
+def process_video_file(video_path: Path, filename_stem: str) -> (dict, str):
+    """
+    Uses FFmpeg to extract metadata and a thumbnail from a video.
+    Returns a dictionary of metadata and the thumbnail filename.
+    """
+    logger.info(f"Processing video file: {video_path}")
+    thumbnail_filename = f"{filename_stem}_thumb.jpg" # Always save video thumbs as jpg
+    thumbnail_filepath = settings.UPLOAD_PATH / thumbnail_filename
+    
+    try:
+        # Probe for video metadata
+        probe = ffmpeg.probe(str(video_path))
+        video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
+        if video_stream is None:
+            raise RuntimeError("No video stream found in the file.")
+
+        metadata = {
+            "width": int(video_stream['width']),
+            "height": int(video_stream['height']),
+            "duration": float(video_stream['duration']),
+        }
+        
+        # Extract the first frame as a thumbnail
+        (
+            ffmpeg
+            .input(str(video_path), ss=0) # Seek to the beginning
+            .output(str(thumbnail_filepath), vframes=1) # Output one frame
+            .overwrite_output()
+            .run(capture_stdout=True, capture_stderr=True)
+        )
+        logger.info(f"Generated video thumbnail: {thumbnail_filepath}")
+        
+        return metadata, thumbnail_filename
+        
+    except ffmpeg.Error as e:
+        logger.error(f"FFmpeg error processing {video_path}: {e.stderr.decode()}")
+        raise  # Re-raise the exception to be handled by the route
+    except Exception as e:
+        logger.error(f"General error processing video {video_path}: {e}")
+        raise
 
 def delete_image_files(filename: str, thumbnail_filename: Optional[str]):
     """Deletes the main image file and its thumbnail."""

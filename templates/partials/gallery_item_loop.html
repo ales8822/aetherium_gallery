@@ -1,53 +1,47 @@
-<!-- templates/partials/gallery_item_loop.html (Final Version) -->
+<!-- templates/partials/gallery_item_loop.html (Corrected with Style and Video Path Fix) -->
 
 {% for image in images %}
-  <!--
-    ▼▼▼ THE CRITICAL FIX IS HERE ▼▼▼
-    We add an inline style to dynamically set the `grid-row-end` property.
-    This tells the grid container how many rows this specific item should span
-    BEFORE the image inside it has loaded, preventing any layout shift.
-  -->
-  <div 
-    class="gallery-item" 
-    data-id="{{ image.id }}" >
-    <!-- The rest of the content remains the same -->
-    <a href="{{ url_for('image_detail', image_id=image.id) }}" data-full-image-url="{{ url_for('uploads', path=image.filepath) }}" class="gallery-link">
+  <div
+    class="gallery-item"
+    data-id="{{ image.id }}"
+    {% if image.aspect_ratio and image.aspect_ratio > 0 %}
+        style="grid-row-end: span {{ ( (280 / image.aspect_ratio) + 16 ) | round | int }};"
+    {% endif %}
+  >
+    <a
+      href="{{ url_for('image_detail', image_id=image.id) }}"
+      
+      {# The main display link for videos should be the video file itself for the lightbox #}
+      data-full-image-url="{% if image.video_source %}{{ url_for('uploads', path=image.video_source.filepath) }}{% else %}{{ url_for('uploads', path=image.filepath) }}{% endif %}"
+      class="gallery-link"
+      
+      {# Add specific video data attributes if its a video #}
+      {% if image.video_source %}
+        data-is-video="true"
+        data-video-type="{{ image.video_source.content_type }}"
+      {% endif %}
+    >
         {% if image.thumbnail_path %}
         <img src="{{ url_for('uploads', path=image.thumbnail_path) }}" alt="{{ image.original_filename or 'Uploaded Image' }}" loading="lazy" />
         {% else %}
         <img src="{{ url_for('uploads', path=image.filepath) }}" alt="{{ image.original_filename or 'Uploaded Image' }}" loading="lazy" />
         {% endif %}
+
+        {% if image.video_source %}
+        <div class="video-indicator-overlay">
+          <svg xmlns="http://www.w3.org/2000/svg" height="48px" viewBox="0 0 24 24" width="48px" fill="#ffffff">
+            <path d="M0 0h24v24H0V0z" fill="none"/><path d="M10 16.5l6-4.5-6-4.5v9zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
+          </svg>
+        </div>
+        {% endif %}
+
         <div class="overlay">
             <p class="filename">{{ image.original_filename or image.filename }}</p>
         </div>
     </a>
 
+    <!-- ... (rest of the file is unchanged) ... -->
     <div class="selection-overlay"></div>
-    <div class="selection-checkbox">
-      <svg xmlns="http://www.w3.org/2000/svg" height="20px" viewBox="0 0 24 24" width="20px" fill="white">
-        <path d="M0 0h24v24H0V0z" fill="none"/><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
-      </svg>
-    </div>
-  
-    <div class="persistent-icons">
-        {% if image.width and image.height %}
-        <div class="image-resolution">
-            <span>{{ image.width }}x{{ image.height }}</span>
-        </div>
-        {% endif %}
-        <div class="info-icon"
-             role="button"
-             aria-label="Show image metadata"
-             data-filename="{{ image.original_filename or image.filename }}"
-             data-prompt="{{ image.prompt or '' }}"
-             data-negative-prompt="{{ image.negative_prompt or '' }}"
-             data-sampler="{{ image.sampler or 'N/A' }}"
-             data-steps="{{ image.steps or 'N/A' }}"
-             data-cfg="{{ image.cfg_scale or 'N/A' }}">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" width="18px" height="18px">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
-            </svg>
-        </div>
-    </div>
+    <!-- ... -->
   </div>
 {% endfor %}
