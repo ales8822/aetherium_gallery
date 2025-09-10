@@ -101,24 +101,88 @@ async def delete_image(db: AsyncSession, image_id: int) -> Optional[models.Image
         return db_image
     return None
 
+async def get_related_images(db: AsyncSession, source_image: models.Image, limit: int = 10) -> List[models.Image]:
+    """
+    Finds images that share the most tags with the source_image.
+    """
+    # If the source image has no tags, we can't find related items.
+    if not source_image.tags:
+        return []
+
+    source_tag_ids = {tag.id for tag in source_image.tags}
+
+    # This is an advanced query. Let's break it down:
+    # 1. We start with the image_tags_association table.
+    # 2. We filter it to find rows where the tag_id is one of our source image's tags.
+    # 3. We group by the image_id in that table.
+    # 4. We count the number of matching tags for each image_id, creating a "match_count".
+    # 5. We order the results so the images with the highest match_count come first.
+    subquery = (
+        select(
+            models.image_tags_association.c.image_id,
+            func.count(models.image_tags_association.c.tag_id).label("match_count"),
+        )
+        .where(models.image_tags_association.c.tag_id.in_(source_tag_ids))
+        .group_by(models.image_tags_association.c.image_id)
+        .order_by(func.count(models.image_tags_association.c.tag_id).desc())
+        .subquery()
+    )
+
+    # Now, we join the Image table with our subquery result.
+    query = (
+        select(models.Image)
+        .join(subquery, models.Image.id == subquery.c.image_id)
+        # Crucially, we exclude the source image itself from the results!
+        .filter(models.Image.id != source_image.id)
+        # Eagerly load the data we need for the gallery display
+        .options(
+            selectinload(models.Image.tags),
+            selectinload(models.Image.video_source)
+        )
+        # Order by the match_count from our subquery
+        .order_by(subquery.c.match_count.desc())
+        .limit(limit)
+    )
+
+    result = await db.execute(query)
+    return result.scalars().all()
+
 
 async def search_images(
     db: AsyncSession, 
     query: str, 
     safe_mode: bool = False, 
-    # Add new parameter
     media_type: str = 'all', 
     skip: int = 0, 
     limit: int = 100
 ) -> List[models.Image]:
-    # ...
-    db_query = select(models.Image).filter(...)
-    db_query = db_query.options(selectinload(models.Image.video_source))
+    """
+    Searches for images where the query string matches in the prompt,
+    negative prompt, or original filename.
+    """
+    if not query:
+        return []
+
+    search_term = f"%{query}%"
+
+    # Start building the database query correctly
+    db_query = select(models.Image).filter(
+        or_(
+            models.Image.prompt.ilike(search_term),
+            models.Image.negative_prompt.ilike(search_term),
+            models.Image.original_filename.ilike(search_term),
+        )
+    )
+
+    # Eagerly load relationships
+    db_query = db_query.options(
+        selectinload(models.Image.tags), 
+        selectinload(models.Image.video_source)
+    )
 
     if safe_mode:
         db_query = db_query.filter(models.Image.is_nsfw == False)
         
-    # ▼▼▼ ADD THIS NEW FILTER LOGIC ▼▼▼
     if media_type == 'video':
         db_query = db_query.filter(models.Image.video_source_id.isnot(None))
     elif media_type == 'image':
@@ -152,28 +216,25 @@ async def get_or_create_tags_by_name(db: AsyncSession, tag_names: List[str]) -> 
     return existing_tags + new_tags
 
 async def get_images_by_tag(
-    db: AsyncSession, tag_name: str, safe_mode: bool = False, media_type: str = 'all', skip: int = 0, limit: int = 100
+    db: AsyncSession, 
+    tag_name: str, 
+    safe_mode: bool = False, 
+    media_type: str = 'all', 
+    skip: int = 0, 
+    limit: int = 100
 ) -> List[models.Image]:
-    """
-    Get all images associated with a specific tag name.
-    """
-    query = (
-        select(models.Image)
-        .options(
-            selectinload(models.Image.tags),
-            selectinload(models.Image.video_source)
-         ) # Eagerly load video source)
-        .join(models.Image.tags)
-        .filter(models.Tag.name == tag_name)
-    )
+    # ... (initial query setup is fine)
     if safe_mode:
         query = query.filter(models.Image.is_nsfw == False)
+        
+    # ▼▼▼ THIS IS THE FIX ▼▼▼
+    # Use the 'query' variable consistently
     if media_type == 'video':
-        db_query = db_query.filter(models.Image.video_source_id.isnot(None))
+        query = query.filter(models.Image.video_source_id.isnot(None))
     elif media_type == 'image':
-        db_query = db_query.filter(models.Image.video_source_id.is_(None))
+        query = query.filter(models.Image.video_source_id.is_(None))
+        
     query = query.order_by(models.Image.upload_date.desc()).offset(skip).limit(limit)
-    
     result = await db.execute(query)
     return result.scalars().all()
 

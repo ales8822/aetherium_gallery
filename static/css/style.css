@@ -794,6 +794,16 @@ button.cancel-button:hover {
     object-fit: contain; /* Scales the content to fit inside the container without stretching */
 }
 
+.related-images-section {
+    margin-top: 4rem; /* Add plenty of space above */
+    border-top: 1px solid #444;
+    padding-top: 2rem;
+}
+.section-title {
+    /* Uses the existing h2 styles, but we might want a different margin */
+    margin-bottom: 2rem;
+}
+
 /* --- Responsive Adjustments --- */
 @media (max-width: 1200px) {
   .gallery-grid {

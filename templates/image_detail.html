@@ -152,6 +152,18 @@
         <div id="status-message" style="margin-top: 1rem; font-weight: bold;"></div>
     </div>
 </div>
+{% if related_images %}
+        <div class="related-images-section">
+            <h2 class="section-title">Related Images</h2>
+            <!-- 
+              We rename 'related_images' to just 'images' for the partial.
+              The 'with' statement creates a temporary context for the include.
+            -->
+            {% with images=related_images %}
+                {% include 'partials/gallery_grid.html' %}
+            {% endwith %}
+        </div>
+        {% endif %}
 {% endblock %}
 
 {% block scripts_extra %}

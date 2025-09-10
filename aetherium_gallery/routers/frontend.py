@@ -65,10 +65,15 @@ async def read_image_detail(request: Request, image_id: int, db: AsyncSession = 
     # Fetch all albums to populate the editor's dropdown menu
     all_albums_with_counts = await crud.get_all_albums(db)
     all_albums = [album for album, count in all_albums_with_counts]
+
+     # Fetch related images based on the current image's tags
+    related_images = await crud.get_related_images(db, source_image=db_image, limit=10)
+
     return templates.TemplateResponse("image_detail.html", {
         "request": request,
         "image": db_image, # Pass ORM model directly
         "all_albums": all_albums,
+        "related_images": related_images,
         "upload_folder": f"/{settings.UPLOAD_FOLDER}", # Access UPLOAD_FOLDER from the settings instance
         "page_title": f"Image - {db_image.original_filename or db_image.filename}",
         "now": datetime.datetime.now, # Pass it here too
@@ -78,28 +83,33 @@ async def read_image_detail(request: Request, image_id: int, db: AsyncSession = 
 async def search_results(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    # Use Query() for better validation and documentation
     q: Optional[str] = Query(None, min_length=2, max_length=100)
 ):
     """Displays search results based on a query."""
     safe_mode_enabled = request.cookies.get("safe_mode", "off") == "on"
+    media_filter = request.cookies.get("media_filter", "all")
+    
+    # Always fetch albums
+    albums_with_counts = await crud.get_all_albums(db)
+    albums = [album for album, count in albums_with_counts]
     
     images = []
     if q:
-        # Call our new CRUD function
-        images = await crud.search_images(db, query=q, safe_mode=safe_mode_enabled, limit=100)
-        albums_with_counts = await crud.get_all_albums(db)
-        albums = [album for album, count in albums_with_counts]
+        # Pass the media_filter to the search function
+        images = await crud.search_images(
+            db, query=q, safe_mode=safe_mode_enabled, media_type=media_filter, limit=100
+        )
 
     return templates.TemplateResponse("search_results.html", {
         "request": request,
         "images": images,
-        "albums": albums,
+        "albums": albums, # Pass the correct, always-defined variable
         "image_count": len(images),
         "search_query": q,
         "page_title": f"Search results for '{q}'",
         "now": datetime.datetime.now,
         "safe_mode": safe_mode_enabled,
+        "media_filter": media_filter
     })
 
 @router.get("/tag/{tag_name}", response_class=HTMLResponse, name="tag_gallery")
