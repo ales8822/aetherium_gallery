@@ -152,7 +152,7 @@ async def get_or_create_tags_by_name(db: AsyncSession, tag_names: List[str]) -> 
     return existing_tags + new_tags
 
 async def get_images_by_tag(
-    db: AsyncSession, tag_name: str, safe_mode: bool = False, skip: int = 0, limit: int = 100
+    db: AsyncSession, tag_name: str, safe_mode: bool = False, media_type: str = 'all', skip: int = 0, limit: int = 100
 ) -> List[models.Image]:
     """
     Get all images associated with a specific tag name.
@@ -243,10 +243,16 @@ async def bulk_update_images(db: AsyncSession, action_request: schemas.BulkActio
 # --- Album CRUD ---
 
 async def get_album(db: AsyncSession, album_id: int) -> Optional[models.Album]:
-    """Get a single album by its ID, eagerly loading its images and their tags."""
+    """Get a single album by its ID, eagerly loading its images and their relationships."""
     result = await db.execute(
         select(models.Album)
-        .options(selectinload(models.Album.images).selectinload(models.Image.tags).selectinload(models.Image.video_source)) # Eager load image's video)
+        .options(
+            # Use a chained selectinload for nested relationships
+            selectinload(models.Album.images).options(
+                selectinload(models.Image.tags),         # Load tags from the Image
+                selectinload(models.Image.video_source)  # ALSO load video_source from the Image
+            )
+        )
         .filter(models.Album.id == album_id)
     )
     return result.scalars().first()

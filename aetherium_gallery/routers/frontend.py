@@ -28,7 +28,8 @@ async def read_gallery_index(
 
     # Pass the flag to the CRUD function
     images = await crud.get_images(db, skip=skip, limit=limit, safe_mode=safe_mode_enabled,  media_type=media_filter )
-    albums = await crud.get_all_albums(db)
+    albums_with_counts = await crud.get_all_albums(db)
+    albums = [album for album, count in albums_with_counts]
 
     return templates.TemplateResponse("index.html", {
         "request": request,
@@ -87,7 +88,8 @@ async def search_results(
     if q:
         # Call our new CRUD function
         images = await crud.search_images(db, query=q, safe_mode=safe_mode_enabled, limit=100)
-        albums = await crud.get_all_albums(db)
+        albums_with_counts = await crud.get_all_albums(db)
+        albums = [album for album, count in albums_with_counts]
 
     return templates.TemplateResponse("search_results.html", {
         "request": request,
@@ -113,7 +115,8 @@ async def read_images_by_tag(
     images = await crud.get_images_by_tag(
         db, tag_name=tag_name, safe_mode=safe_mode_enabled, limit=100
     )
-    albums = await crud.get_all_albums(db)
+    albums_with_counts = await crud.get_all_albums(db)
+    albums = [album for album, count in albums_with_counts]
 
     return templates.TemplateResponse("tag_gallery.html", {
         "request": request,
