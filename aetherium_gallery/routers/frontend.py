@@ -23,9 +23,11 @@ async def read_gallery_index(
     """Serves the main gallery page."""
     # Check for the 'safe_mode' cookie from the user's browser
     safe_mode_enabled = request.cookies.get("safe_mode", "off") == "on"
+    # Read the new media filter cookie, defaulting to 'all'
+    media_filter = request.cookies.get("media_filter", "all")
 
     # Pass the flag to the CRUD function
-    images = await crud.get_images(db, skip=skip, limit=limit, safe_mode=safe_mode_enabled)
+    images = await crud.get_images(db, skip=skip, limit=limit, safe_mode=safe_mode_enabled,  media_type=media_filter )
     albums = await crud.get_all_albums(db)
 
     return templates.TemplateResponse("index.html", {
@@ -35,7 +37,8 @@ async def read_gallery_index(
         "upload_folder": f"/{settings.UPLOAD_FOLDER}",
         "page_title": "Aetherium Gallery",
         "now": datetime.datetime.now,
-        "safe_mode": safe_mode_enabled # Pass the status to the template
+        "safe_mode": safe_mode_enabled,
+        "media_filter": media_filter, 
     })
 
 @router.get("/upload", response_class=HTMLResponse, name="upload_form")

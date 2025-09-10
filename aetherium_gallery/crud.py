@@ -24,15 +24,32 @@ async def get_image(db: AsyncSession, image_id: int) -> Optional[models.Image]:
     return result.scalars().first()
 
 async def get_images(
-    db: AsyncSession, skip: int = 0, limit: int = 100, safe_mode: bool = False
+    db: AsyncSession, 
+    skip: int = 0, 
+    limit: int = 100, 
+    safe_mode: bool = False,
+    # Add new parameter with default 'all'
+    media_type: str = 'all' 
 ) -> List[models.Image]:
-    """Get a list of images, eagerly loading their tags."""
+    """
+    Get a list of images with pagination and optional filters.
+    """
     query = select(models.Image).options(
         selectinload(models.Image.tags),
-        selectinload(models.Image.video_source) # Eagerly load video source
+        selectinload(models.Image.video_source)
     )
+    
     if safe_mode:
         query = query.filter(models.Image.is_nsfw == False)
+        
+    # ▼▼▼ ADD THIS NEW FILTER LOGIC ▼▼▼
+    if media_type == 'video':
+        # Filter for images that HAVE a video source linked
+        query = query.filter(models.Image.video_source_id.isnot(None))
+    elif media_type == 'image':
+        # Filter for images that DO NOT have a video source
+        query = query.filter(models.Image.video_source_id.is_(None))
+    
     query = query.order_by(models.Image.upload_date.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     return result.scalars().all()
@@ -86,36 +103,28 @@ async def delete_image(db: AsyncSession, image_id: int) -> Optional[models.Image
 
 
 async def search_images(
-    db: AsyncSession, query: str, safe_mode: bool = False, skip: int = 0, limit: int = 100
+    db: AsyncSession, 
+    query: str, 
+    safe_mode: bool = False, 
+    # Add new parameter
+    media_type: str = 'all', 
+    skip: int = 0, 
+    limit: int = 100
 ) -> List[models.Image]:
-    """
-    Searches for images where the query string matches in the prompt,
-    negative prompt, or original filename.
-    """
-    if not query:
-        return []
-
-    # The search term needs to be wrapped with % for a 'contains' search
-    search_term = f"%{query}%"
-
-    # Start building the database query
-    db_query = select(models.Image).filter(
-        # Use or_ to find matches in any of the specified fields
-        or_(
-            models.Image.prompt.ilike(search_term),
-            models.Image.negative_prompt.ilike(search_term),
-            models.Image.original_filename.ilike(search_term),
-        )
-    )
+    # ...
+    db_query = select(models.Image).filter(...)
     db_query = db_query.options(selectinload(models.Image.video_source))
 
-    # Apply the safe mode filter if it's enabled
     if safe_mode:
         db_query = db_query.filter(models.Image.is_nsfw == False)
-    
-    # Apply ordering and pagination
+        
+    # ▼▼▼ ADD THIS NEW FILTER LOGIC ▼▼▼
+    if media_type == 'video':
+        db_query = db_query.filter(models.Image.video_source_id.isnot(None))
+    elif media_type == 'image':
+        db_query = db_query.filter(models.Image.video_source_id.is_(None))
+        
     db_query = db_query.order_by(models.Image.upload_date.desc()).offset(skip).limit(limit)
-
     result = await db.execute(db_query)
     return result.scalars().all()
 
@@ -159,7 +168,10 @@ async def get_images_by_tag(
     )
     if safe_mode:
         query = query.filter(models.Image.is_nsfw == False)
-    
+    if media_type == 'video':
+        db_query = db_query.filter(models.Image.video_source_id.isnot(None))
+    elif media_type == 'image':
+        db_query = db_query.filter(models.Image.video_source_id.is_(None))
     query = query.order_by(models.Image.upload_date.desc()).offset(skip).limit(limit)
     
     result = await db.execute(query)
