@@ -233,12 +233,36 @@ document.addEventListener('DOMContentLoaded', function () {
         const updateData = {};
 
         for (const [key, value] of formData.entries()) {
-            // Include empty strings for fields that are cleared
-            updateData[key] = value;
+            const inputElement = editForm.elements[key];
+            const trimmedValue = value.trim();
+
+            // --- Handle specific fields first ---
+            if (key === 'album_id') {
+                // If the value is an empty string, set it to null. Otherwise, parse as int.
+                updateData[key] = trimmedValue === '' ? null : parseInt(trimmedValue, 10);
+            } 
+            else if (inputElement.type === 'number' && trimmedValue !== '') {
+                updateData[key] = parseFloat(trimmedValue);
+            }
+            else if (key === 'seed' && trimmedValue !== '') {
+                // Also handle seed, which is text but should be an integer
+                updateData[key] = parseInt(trimmedValue, 10);
+            }
+            else {
+                // For regular text fields, use the value directly
+                updateData[key] = value; // Use original value to preserve whitespace in prompts etc.
+            }
         }
 
-        // Handle the boolean checkbox separately and correctly
+        // Handle the boolean checkbox separately
         updateData['is_nsfw'] = editForm.elements['is_nsfw'].checked;
+        
+        // Remove empty numeric fields that might have parsed to NaN
+        for (const key in updateData) {
+            if (typeof updateData[key] === 'number' && isNaN(updateData[key])) {
+                updateData[key] = null;
+            }
+        }
         
         statusMessage.textContent = 'Saving...';
         statusMessage.style.color = '#e0e0e0';
@@ -250,17 +274,19 @@ document.addEventListener('DOMContentLoaded', function () {
         })
         .then(response => {
             if (!response.ok) {
-                return response.json().then(err => { throw new Error(err.detail || 'Unknown error'); });
+                return response.json().then(err => { 
+                    let errorMsg = err.detail || 'Unknown error';
+                    if (Array.isArray(err.detail)) {
+                       errorMsg = err.detail.map(e => `${e.loc.join('.')}: ${e.msg}`).join('; ');
+                    }
+                    throw new Error(errorMsg); 
+                });
             }
             return response.json();
         })
         .then(updatedImage => {
-            // The best way to reflect all changes (including new tags) is to just reload.
-            // This is simpler and more reliable than manually updating complex fields.
             statusMessage.textContent = 'Successfully saved! Reloading...';
             statusMessage.style.color = '#81c784';
-            
-            // Reload the page after 1 second to show all changes.
             setTimeout(() => { window.location.reload(); }, 1000);
         })
         .catch(error => {
