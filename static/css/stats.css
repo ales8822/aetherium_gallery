@@ -1,0 +1,86 @@
+/* static/css/stats.css */
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background-color: #252525;
+    padding: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid #444;
+}
+
+.stat-card h3 {
+    margin-top: 0;
+    font-size: 1.1em;
+    color: #aaa;
+    text-transform: uppercase;
+    border-bottom: 1px solid #555;
+    padding-bottom: 0.5rem;
+}
+
+.stat-card .value {
+    font-size: 2.5em;
+    font-weight: bold;
+    color: #64b5f6;
+    margin-bottom: 0.5rem;
+}
+
+.stat-card .sub-value {
+    font-size: 0.9em;
+    color: #999;
+}
+
+
+/* --- Styles for lists (tags, samplers) --- */
+
+.list-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    align-items: start;
+}
+
+.list-card {
+    background-color: #252525;
+    border-radius: 8px;
+    border: 1px solid #444;
+    overflow: hidden; /* To contain the table styles */
+}
+
+.list-card h2 {
+    margin: 0;
+    padding: 1rem 1.5rem;
+    background-color: #303030;
+    font-size: 1.4em;
+}
+
+.stats-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.stats-table th, .stats-table td {
+    padding: 0.8rem 1.5rem;
+    text-align: left;
+    border-bottom: 1px solid #444;
+}
+
+.stats-table thead th {
+    font-weight: bold;
+    color: #ccc;
+}
+
+.stats-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.stats-table .count-cell {
+    text-align: right;
+    font-weight: bold;
+    color: #64b5f6;
+}

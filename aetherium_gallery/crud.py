@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy import or_, func # This is the ONLY import we need for SQL functions
+from sqlalchemy import case
 
 from . import models, schemas
 from typing import List, Optional
@@ -368,3 +369,70 @@ async def create_video_source(db: AsyncSession, video_data: dict) -> models.Vide
     await db.commit()
     await db.refresh(db_video_source)
     return db_video_source
+
+
+# --- Statistics CRUD ---
+
+async def get_gallery_statistics(db: AsyncSession) -> dict:
+    """
+    Performs a series of aggregation queries to get comprehensive
+    statistics about the gallery.
+    """
+    
+    # Query 1: General Counts (images, videos, total size)
+    counts_query = select(
+        func.count(models.Image.id).label("total_count"),
+        func.count(models.Image.video_source_id).label("video_count"),
+        func.sum(models.Image.size_bytes).label("total_size_images"),
+        func.sum(models.VideoSource.size_bytes).label("total_size_videos")
+    ).outerjoin(models.Image.video_source)
+    
+    counts_result = (await db.execute(counts_query)).first()
+    total_items = counts_result.total_count or 0
+    video_items = counts_result.video_count or 0
+    image_items = total_items - video_items
+    total_size = (counts_result.total_size_images or 0) + (counts_result.total_size_videos or 0)
+
+    # Query 2: SFW vs NSFW Counts
+    nsfw_query = select(
+        func.count(models.Image.id).label("total"),
+        func.sum(case((models.Image.is_nsfw == True, 1), else_=0)).label("nsfw_count")
+    )
+    nsfw_result = (await db.execute(nsfw_query)).first()
+    nsfw_items = nsfw_result.nsfw_count or 0
+    sfw_items = (nsfw_result.total or 0) - nsfw_items
+
+    # Query 3: Top 10 most used tags
+    top_tags_query = (
+        select(models.Tag.name, func.count(models.image_tags_association.c.image_id).label("tag_count"))
+        .join(models.image_tags_association, models.Tag.id == models.image_tags_association.c.tag_id)
+        .group_by(models.Tag.name)
+        .order_by(func.count(models.image_tags_association.c.image_id).desc())
+        .limit(10)
+    )
+    top_tags_result = await db.execute(top_tags_query)
+    top_tags = top_tags_result.all()
+
+    # Query 4: Top 5 most used samplers
+    top_samplers_query = (
+        select(models.Image.sampler, func.count(models.Image.id).label("sampler_count"))
+        .filter(models.Image.sampler.isnot(None))
+        .group_by(models.Image.sampler)
+        .order_by(func.count(models.Image.id).desc())
+        .limit(5)
+    )
+    top_samplers_result = await db.execute(top_samplers_query)
+    top_samplers = top_samplers_result.all()
+
+    # --- Assemble the final statistics dictionary ---
+    stats = {
+        "total_items": total_items,
+        "image_count": image_items,
+        "video_count": video_items,
+        "total_size_bytes": total_size,
+        "nsfw_counts": {"sfw": sfw_items, "nsfw": nsfw_items},
+        "top_tags": [{"name": name, "count": count} for name, count in top_tags],
+        "top_samplers": [{"name": name, "count": count} for name, count in top_samplers],
+    }
+    
+    return stats

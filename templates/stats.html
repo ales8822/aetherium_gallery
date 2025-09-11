@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block head_extra %}
+    <!-- Link to our new stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/stats.css') }}">
+{% endblock %}
+
+{% block content %}
+<h1>{{ page_title }}</h1>
+
+<!-- Overview Cards -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <h3>Total Items</h3>
+        <div class="value">{{ stats.total_items }}</div>
+        <div class="sub-value">{{ stats.image_count }} Images / {{ stats.video_count }} Videos</div>
+    </div>
+    <div class="stat-card">
+        <h3>Total Size</h3>
+        <div class="value">{{ stats.total_size_formatted }}</div>
+    </div>
+    <div class="stat-card">
+        <h3>Content Safety</h3>
+        <div class="value">{{ stats.nsfw_counts.sfw }}</div>
+        <div class="sub-value">SFW Items / {{ stats.nsfw_counts.nsfw }} NSFW Items</div>
+    </div>
+</div>
+
+<!-- Detailed Lists -->
+<div class="list-grid">
+    <div class="list-card">
+        <h2>Top 10 Tags</h2>
+        {% if stats.top_tags %}
+        <table class="stats-table">
+            <thead>
+                <tr>
+                    <th>Tag Name</th>
+                    <th class="count-cell">Count</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tag in stats.top_tags %}
+                <tr>
+                    <td>{{ tag.name }}</td>
+                    <td class="count-cell">{{ tag.count }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="padding: 1.5rem;">No tags have been used yet.</p>
+        {% endif %}
+    </div>
+
+    <div class="list-card">
+        <h2>Top 5 Samplers</h2>
+        {% if stats.top_samplers %}
+        <table class="stats-table">
+            <thead>
+                <tr>
+                    <th>Sampler Name</th>
+                    <th class="count-cell">Count</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sampler in stats.top_samplers %}
+                <tr>
+                    <td>{{ sampler.name }}</td>
+                    <td class="count-cell">{{ sampler.count }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+         {% else %}
+        <p style="padding: 1.5rem;">No samplers have been recorded yet.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
