@@ -115,4 +115,8 @@ class Album(AlbumBase):
 
     class Config:
         from_attributes = True
+
+
+class AlbumReorderRequest(BaseModel):
+    image_ids: List[int]
     

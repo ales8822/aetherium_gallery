@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy import or_, func # This is the ONLY import we need for SQL functions
-from sqlalchemy import case
+from sqlalchemy import case, update
 
 from . import models, schemas
 from typing import List, Optional
@@ -101,6 +101,35 @@ async def delete_image(db: AsyncSession, image_id: int) -> Optional[models.Image
         await db.commit()
         return db_image
     return None
+
+async def update_image_order_in_album(db: AsyncSession, album_id: int, ordered_image_ids: List[int]) -> bool:
+    """
+    Updates the order_index for a list of images within a specific album using direct UPDATE statements.
+    """
+    if not ordered_image_ids:
+        return True # Nothing to do is a success case.
+
+    try:
+        # We will execute a series of individual UPDATE statements.
+        # This direct method is the most reliable way to ensure the changes are saved.
+        for index, image_id in enumerate(ordered_image_ids):
+            stmt = (
+                update(models.Image)
+                .where(models.Image.id == image_id)
+                .where(models.Image.album_id == album_id) # Safety check
+                .values(order_index=index)
+            )
+            await db.execute(stmt)
+        
+        # After all individual update statements have been executed, commit the transaction.
+        await db.commit()
+    except Exception as e:
+        await db.rollback() # On any error, undo all changes in this transaction.
+        # Optionally, you can add logging here to see the error in your terminal
+        # logger.error(f"Failed to reorder album {album_id}: {e}", exc_info=True)
+        return False
+        
+    return True
 
 async def get_related_images(db: AsyncSession, source_image: models.Image, limit: int = 10) -> List[models.Image]:
     """
@@ -304,20 +333,34 @@ async def bulk_update_images(db: AsyncSession, action_request: schemas.BulkActio
 
 # --- Album CRUD ---
 
-async def get_album(db: AsyncSession, album_id: int) -> Optional[models.Album]:
-    """Get a single album by its ID, eagerly loading its images and their relationships."""
-    result = await db.execute(
-        select(models.Album)
-        .options(
-            # Use a chained selectinload for nested relationships
-            selectinload(models.Album.images).options(
-                selectinload(models.Image.tags),         # Load tags from the Image
-                selectinload(models.Image.video_source)  # ALSO load video_source from the Image
-            )
-        )
-        .filter(models.Album.id == album_id)
+async def get_album(db: AsyncSession, album_id: int) -> Optional[dict]:
+    """
+    Get a single album by ID and a separate, sorted list of its images.
+    Returns a dictionary to avoid lazy-loading issues.
+    """
+    # Step 1: Get the album itself.
+    album_result = await db.execute(
+        select(models.Album).filter(models.Album.id == album_id)
     )
-    return result.scalars().first()
+    album = album_result.scalars().first()
+
+    if not album:
+        return None
+        
+    # Step 2: Get all images for this album, sorted and with relationships.
+    images_result = await db.execute(
+        select(models.Image)
+        .filter(models.Image.album_id == album_id)
+        .options(
+            selectinload(models.Image.tags),
+            selectinload(models.Image.video_source)
+        )
+        .order_by(models.Image.order_index)
+    )
+    images = images_result.scalars().all()
+    
+    # Step 3: Return a simple dictionary.
+    return {"album": album, "images": images}
 
 async def get_all_albums(db: AsyncSession) -> List:
     """

@@ -1,5 +1,11 @@
 <!-- templates/partials/gallery_grid.html (Final, Corrected Version with data-id) -->
 
-<div class="gallery-grid">
-  {% include 'partials/gallery_item_loop.html' %}
+<!-- templates/partials/gallery_grid.html (Updated) -->
+<!-- If grid_id is passed, use it, otherwise don't add an id attribute -->
+<div
+class="gallery-grid"
+{% if grid_id %}id="{{ grid_id }}"{% endif %}
+{% if album_id %}data-album-id="{{ album_id }}"{% endif %}
+>
+{% include 'partials/gallery_item_loop.html' %}
 </div>

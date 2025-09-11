@@ -4,10 +4,14 @@
   <div
     class="gallery-item"
     data-id="{{ image.id }}"
+ 
     {% if image.aspect_ratio and image.aspect_ratio > 0 %}
         style="grid-row-end: span {{ ( (280 / image.aspect_ratio) + 16 ) | round | int }};"
     {% endif %}
   >
+     <div class="order-index-debug" title="Database Order Index">
+        {{ image.order_index }}
+    </div>
     <a
       href="{{ url_for('image_detail', image_id=image.id) }}"
       

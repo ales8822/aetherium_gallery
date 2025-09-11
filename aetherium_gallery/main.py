@@ -22,6 +22,7 @@ import logging
 from .config import settings, BASE_DIR
 from .database import init_db
 from .routers import frontend, images, albums, stats# Import router modules
+from .routers.api import albums as albums_api # Import with an alias to avoid name conflict
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -54,6 +55,7 @@ app.include_router(images.upload_router) # User-facing upload endpoint
 app.include_router(images.router) # API endpoints under /api/images
 app.include_router(albums.router)
 app.include_router(stats.router)
+app.include_router(albums_api.router)
 
 # --- Basic Error Handling (Example) ---
 @app.exception_handler(Exception)

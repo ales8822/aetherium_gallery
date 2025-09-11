@@ -33,21 +33,29 @@ async def list_all_albums(request: Request, db: AsyncSession = Depends(get_db)):
 @router.get("/album/{album_id}", response_class=HTMLResponse, name="view_album")
 async def view_album_contents(request: Request, album_id: int, db: AsyncSession = Depends(get_db)):
     """Serves the gallery page for a single album."""
-    album = await crud.get_album(db, album_id=album_id)
-    if not album:
+    # Our CRUD function now returns a dictionary {'album': ..., 'images': ...}
+    # This prevents SQLAlchemy async lazy-loading errors.
+    album_data = await crud.get_album(db, album_id=album_id)
+    
+    if not album_data:
         raise HTTPException(status_code=404, detail="Album not found")
         
+    # Extract the data from the dictionary
+    album = album_data["album"]
+    images_in_album = album_data["images"]
+    
+    # Check for the safe_mode cookie
     safe_mode_enabled = request.cookies.get("safe_mode", "off") == "on"
     
-    # Filter images based on safe mode if needed
-    images_in_album = [img for img in album.images if not (safe_mode_enabled and img.is_nsfw)]
-    # Re-sort images by date since the relationship does not guarantee order
-    images_in_album.sort(key=lambda x: x.upload_date, reverse=True)
+    # The images list from CRUD is already sorted correctly by `order_index`.
+    # We only need to apply the safe mode filter if it's enabled.
+    if safe_mode_enabled:
+        images_in_album = [img for img in images_in_album if not img.is_nsfw]
 
     return templates.TemplateResponse("albums/album_detail.html", {
         "request": request,
         "album": album,
-        "images": images_in_album, # Pass the filtered and sorted list
+        "images": images_in_album, # Pass the filtered and pre-sorted list
         "image_count": len(images_in_album),
         "page_title": f"Album: {album.name}",
         "now": datetime.datetime.now,

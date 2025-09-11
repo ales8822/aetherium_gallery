@@ -804,6 +804,53 @@ button.cancel-button:hover {
     margin-bottom: 2rem;
 }
 
+/* --- Album Reordering Styles --- */
+.reordering-active .gallery-item {
+    cursor: grab; /* Show a 'grab' cursor */
+    border: 3px solid #64b5f6; /* Add a border to show they're interactive */
+}
+
+/* Style for the semi-transparent placeholder when dragging */
+.sortable-ghost {
+    opacity: 0.4;
+    background: #444;
+}
+
+/* Hide distracting overlays and icons when reordering */
+.reordering-active .overlay,
+.reordering-active .persistent-icons,
+.reordering-active .selection-overlay,
+.reordering-active .selection-checkbox {
+    display: none !important;
+}
+
+/* Style for the active reorder button */
+button#reorder-button.active {
+    background-color: #e57373; /* Red to indicate "Finish" or "Cancel" action */
+    color: white;
+}
+/* static/css/style.css (Add before @media queries) */
+
+/* --- Debug Order Index Display --- */
+.order-index-debug {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 25; /* Make sure it's on top of everything */
+    background-color: rgba(230, 81, 0, 0.9); /* A bright orange/amber color */
+    color: white;
+    font-size: 0.9em;
+    font-weight: bold;
+    font-family: monospace;
+    padding: 2px 8px;
+    border-radius: 4px;
+    pointer-events: none; /* Make sure it doesn't interfere with clicks */
+}
+
+/* Hide the normal persistent icons when reordering to reduce clutter */
+.reordering-active .persistent-icons {
+    display: none !important;
+}
 /* --- Responsive Adjustments --- */
 @media (max-width: 1200px) {
   .gallery-grid {

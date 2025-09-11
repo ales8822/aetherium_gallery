@@ -5,7 +5,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .database import Base
 from datetime import datetime
-
+from . import models
 # --- Association Tables First ---
 # It's good practice to define association tables at the top.
 image_tags_association = Table('image_tags', Base.metadata,
@@ -18,14 +18,20 @@ image_tags_association = Table('image_tags', Base.metadata,
 
 class Album(Base):
     __tablename__ = "albums"
-
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True, nullable=False)
     description = Column(Text, nullable=True)
     created_date = Column(DateTime(timezone=True), server_default=func.now())
 
-    # This defines the "one-to-many" side: one album has many images.
-    images = relationship("Image", back_populates="album", cascade="all, delete-orphan")
+    # ▼▼▼ THIS IS THE FINAL FIX ▼▼▼
+    # By wrapping "Image.order_index" in a lambda, we tell SQLAlchemy
+    # to evaluate it later, after the Image model has been defined.
+    images = relationship(
+        "Image",
+        back_populates="album",
+        cascade="all, delete-orphan",
+        order_by=lambda: models.Image.order_index # Use lambda and the module prefix
+    )
 
     def __repr__(self):
         return f"<Album(id={self.id}, name='{self.name}')>"
@@ -72,7 +78,8 @@ class Image(Base):
     notes = Column(Text, nullable=True)
     is_favorite = Column(Integer, default=0)
     is_nsfw = Column(Boolean, default=False, nullable=False, index=True)
-    
+    # Used for custom sorting within an album
+    order_index = Column(Integer, default=0, nullable=False)
     # --- RELATIONSHIPS ---
 
     # Many-to-One relationship to Album (the "many" side)
