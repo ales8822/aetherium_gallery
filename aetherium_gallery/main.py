@@ -1,85 +1,89 @@
-# Add these lines at the absolute beginning of the file
-import sys
+# aetherium_gallery/main.py
+
 import os
-print("--- Debug Info ---")
-print(f"Current Working Directory (CWD): {os.getcwd()}")
-print("sys.path:")
-for p in sys.path:
-    print(f"  - {p}")
-print("--- End Debug Info ---")
-print("Attempting imports...") # Add this line right before the 'from fastapi import ...' line
-
-# Existing imports follow...
-from fastapi import FastAPI, Request
-# ... rest of your main.py code
-
+import uvicorn
+import logging
+from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
-import uvicorn
-import logging
 
+# --- Import Order Matters ---
 from .config import settings, BASE_DIR
 from .database import init_db
-from .routers import frontend, images, albums, stats# Import router modules
-from .routers.api import albums as albums_api # Import with an alias to avoid name conflict
+from .services.vector_service import VectorService
+from .routers import frontend, images, albums, stats
+from .routers.api import albums as albums_api
+from .routers.api import images_api as images_api
 
-# Configure logging
+# --- Logging Setup ---
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+logger.info(f"DEBUG mode: {settings.DEBUG}")
 
-app = FastAPI(title="Aetherium Gallery")
-
-# --- Event Handlers ---
-@app.on_event("startup")
-async def on_startup():
-    logger.info("Starting up Aetherium Gallery...")
+# --- Lifespan Manager ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Application startup...")
+    
+    # --- Initialize Database ---
     await init_db()
     logger.info("Database initialized.")
-    logger.info(f"Upload directory: {settings.UPLOAD_PATH}")
-    logger.info(f"Static files directory: {BASE_DIR / 'static'}")
-    logger.info(f"Templates directory: {BASE_DIR / 'templates'}")
 
-# --- Mount Static Files ---
-# Serve the 'static' directory at the '/static' URL path
+    # --- Clear FAISS index in dev mode ---
+    CLEAR_INDEX_ON_STARTUP = getattr(settings, "DEBUG", False) or os.getenv("CLEAR_INDEX", "false").lower() == "true"
+    if CLEAR_INDEX_ON_STARTUP:
+        logger.warning("Clearing old vector index files (DEV MODE)...")
+        index_file = Path("./faiss_index.bin")
+        mapping_file = Path("./faiss_mapping.pkl")
+        if index_file.exists():
+            index_file.unlink()
+        if mapping_file.exists():
+            mapping_file.unlink()
+
+    # --- Initialize Vector Service ---
+    try:
+        app.state.vector_service = VectorService()
+        logger.info("Vector Service initialized successfully.")
+    except Exception as e:
+        app.state.vector_service = None
+        logger.error("FATAL: Vector Service failed to initialize.", exc_info=True)
+
+    yield  # Application runs here
+
+    # --- Shutdown Logic ---
+    logger.info("Application shutdown...")
+    app.state.vector_service = None
+
+# --- FastAPI App Instance ---
+app = FastAPI(title="Aetherium Gallery", lifespan=lifespan)
+
+# --- Mount Static and Upload Directories ---
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
-# Serve the 'uploads' directory at the '/uploads' URL path (adjust security in production!)
-# WARNING: Directly serving the uploads folder might be a security risk.
-# Consider using a dedicated file serving mechanism or cloud storage in production.
 app.mount(f"/{settings.UPLOAD_FOLDER}", StaticFiles(directory=settings.UPLOAD_PATH), name="uploads")
-
 
 # --- Include Routers ---
 app.include_router(frontend.router)
-app.include_router(images.upload_router) # User-facing upload endpoint
-app.include_router(images.router) # API endpoints under /api/images
 app.include_router(albums.router)
 app.include_router(stats.router)
+app.include_router(images.upload_router)
+app.include_router(images.router)
 app.include_router(albums_api.router)
+app.include_router(images_api.router)
 
-# --- Basic Error Handling (Example) ---
+# --- Generic Exception Handler ---
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
-    return JSONResponse(
-        status_code=500,
-        content={"message": "An internal server error occurred."},
-    )
+    return JSONResponse(status_code=500, content={"message": "An internal server error occurred."})
 
-# --- Root Path (Optional - useful for health checks or basic info) ---
+# --- Health Check ---
 @app.get("/health", tags=["Health"])
 async def health_check():
     return {"status": "ok"}
 
-
-# --- Main Execution Block (for running with `python -m aetherium_gallery.main`) ---
-# Note: Typically you run FastAPI with Uvicorn directly from the terminal.
+# --- Run with Uvicorn ---
 if __name__ == "__main__":
     logger.info("Running Uvicorn directly (for development only)...")
-    uvicorn.run(
-        "aetherium_gallery.main:app",
-        host="127.0.0.1",
-        port=8000,
-        reload=True, # Enable auto-reload for development
-        log_level="info"
-    )
+    uvicorn.run("aetherium_gallery.main:app", host="0.0.0.0", port=8000, reload=True)

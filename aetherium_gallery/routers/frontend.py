@@ -3,6 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, Request, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 import os
 import datetime  # Import the datetime module
@@ -139,3 +140,54 @@ async def read_images_by_tag(
         "safe_mode": safe_mode_enabled,
     })
 # Add routes for viewing/managing tags and albums later
+
+@router.get("/similar/{image_id}", response_class=HTMLResponse, name="find_similar")
+async def show_similar_images(
+    request: Request,
+    image_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Displays a gallery of images that are visually similar to the source image.
+    """
+    source_image = await crud.get_image(db, image_id=image_id)
+    if not source_image:
+        raise HTTPException(status_code=404, detail="Source image not found")
+
+    # Use the application state to get the vector service instance
+    vector_service = request.app.state.vector_service
+    
+    similar_images = []
+    if vector_service and not source_image.video_source:
+        # 1. Get the full path to the source image file
+        source_image_path = settings.UPLOAD_PATH / source_image.filename
+        
+        if source_image_path.exists():
+            # 2. Call the new service method with the path and source ID
+            similar_ids = vector_service.find_similar_images_by_path(
+                image_path=source_image_path,
+                source_id=source_image.id,
+                n_results=12 # Ask for a few extra to account for duplicates
+            )
+            
+            # 3. Fetch the full image objects for the returned IDs
+            if similar_ids:
+                db_images = await crud.get_images_by_ids(db, image_ids=similar_ids)
+                # Re-sort the images based on the order from the vector search
+                id_map = {img.id: img for img in db_images}
+                similar_images = [id_map[id] for id in similar_ids if id in id_map]
+
+    # Get the album list for the bulk actions panel
+    albums_with_counts = await crud.get_all_albums(db)
+    albums = [album for album, count in albums_with_counts]
+    
+    return templates.TemplateResponse("similar_results.html", {
+        "request": request,
+        "source_image": source_image,
+        "images": similar_images,
+        "image_count": len(similar_images),
+        "albums": albums,
+        "page_title": f"Images similar to '{source_image.original_filename}'",
+        "now": datetime.datetime.now,
+        "safe_mode": request.cookies.get("safe_mode", "off") == "on"
+    })

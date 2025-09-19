@@ -133,3 +133,7 @@ venv/
 /uploads/
 *.db
 *.db-journal
+
+# FAISS Vector Index Files
+faiss_index.bin
+faiss_mapping.pkl

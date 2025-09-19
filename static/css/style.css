@@ -851,6 +851,80 @@ button#reorder-button.active {
 .reordering-active .persistent-icons {
     display: none !important;
 }
+
+
+/* --- Similar Results Page Styles --- */
+.similar-source-container {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    background-color: #252525;
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid #444;
+    margin-bottom: 2rem;
+}
+.similar-source-image img {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 4px;
+}
+.similar-source-text p {
+    margin: 0;
+    font-size: 0.9em;
+    color: #aaa;
+}
+.similar-source-text h3 {
+    margin: 0;
+    color: #e0e0e0;
+}
+
+
+/* --- Icon Button Styles --- */
+.icon-button {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 30px;
+    height: 30px;
+    background-color: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 50%;
+    color: white;
+    transition: all 0.2s ease;
+}
+.icon-button:hover {
+    background-color: #64b5f6;
+    color: #111;
+    transform: scale(1.1);
+}
+
+/* Standard Action Button (e.g., Edit, Find Similar) */
+.actions .button {
+    background-color: #0288d1; /* A nice blue for primary actions */
+    color: white;
+    padding: 0.5rem 1rem; /* Adjust padding to match other buttons */
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 0.9em; /* Match other buttons */
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+.actions .button:hover {
+    background-color: #03a9f4;
+}
+
+/* Edit button specific style if needed */
+#edit-button {
+    background-color: #0288d1;
+}
+#edit-button:hover {
+    background-color: #03a9f4;
+}
+
 /* --- Responsive Adjustments --- */
 @media (max-width: 1200px) {
   .gallery-grid {

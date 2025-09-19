@@ -1,4 +1,5 @@
 import shutil
+import os
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, Form, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,115 +33,92 @@ async def handle_staged_upload(
     request: Request,
     db: AsyncSession = Depends(get_db),
     file: UploadFile = File(...),
+    # ... all other form fields ...
     original_filename: str = Form(...),
-    prompt: Optional[str] = Form(None),
-    negative_prompt: Optional[str] = Form(None),
-    steps: Optional[str] = Form(None),
-    sampler: Optional[str] = Form(None),
-    cfg_scale: Optional[str] = Form(None),
-    seed: Optional[str] = Form(None),
-    notes: Optional[str] = Form(None),
-    is_nsfw: Optional[str] = Form(None), 
-    tags: Optional[str] = Form(None),
-    album_id: Optional[str] = Form(None)
+    prompt: Optional[str] = Form(None), negative_prompt: Optional[str] = Form(None),
+    steps: Optional[str] = Form(None), sampler: Optional[str] = Form(None),
+    cfg_scale: Optional[str] = Form(None), seed: Optional[str] = Form(None),
+    notes: Optional[str] = Form(None), is_nsfw: Optional[str] = Form(None),
+    tags: Optional[str] = Form(None), album_id: Optional[str] = Form(None)
 ):
-    """
-    Handles a staged upload of a single file, which can be an IMAGE or a VIDEO.
-    """
     content_type = file.content_type
-    if not (content_type.startswith("image/") or content_type.startswith("video/")):
-        raise HTTPException(status_code=400, detail=f"Unsupported file type: {content_type}")
+    if not (content_type and (content_type.startswith("image/") or content_type.startswith("video/"))):
+        raise HTTPException(status_code=400, detail="Unsupported file type.")
 
-    logger.info(f"Processing staged upload for '{original_filename}' of type '{content_type}'")
-    
-    # --- Prepare common data (from form) ---
-    filename_stem, extension, safe_filename = utils.generate_safe_filename(original_filename)
-    
-    # Safely convert form data
+    logger.info(f"Processing '{original_filename}'...")
+
+    form_data = {
+        "prompt": prompt, "negative_prompt": negative_prompt, "sampler": sampler, "notes": notes,
+        "tags": tags, "is_nsfw": (is_nsfw == 'on'),
+        "steps": int(steps) if steps and steps.isdigit() else None,
+        "cfg_scale": float(cfg_scale) if cfg_scale else None,
+        "seed": int(seed) if seed and seed.isdigit() else None,
+        "album_id": int(album_id) if album_id and album_id.isdigit() else None,
+    }
+
+    image_record_data = {}
+    thumbnail_filename = ""
+    saved_path = None # Will hold the final Path object of the saved file
+
     try:
-        steps_int = int(steps) if steps and steps.isdigit() else None
-        cfg_float = float(cfg_scale) if cfg_scale else None
-        seed_int = int(seed) if seed and seed.isdigit() else None
-        album_id_int = int(album_id) if album_id and album_id.isdigit() else None
-    except (ValueError, TypeError):
-        raise HTTPException(status_code=400, detail="Invalid numeric form data provided.")
+        content = await file.read()
+        file_like_object = io.BytesIO(content)
+        filename_stem, _, safe_filename = utils.generate_safe_filename(original_filename)
+
+        # The 'saved_path' variable will now be the definitive location of the final file on disk.
+        saved_path = utils.settings.UPLOAD_PATH / safe_filename
         
-    is_nsfw_bool = (is_nsfw == 'on')
+        # We save the file using a different utility that works directly with bytes
+        with open(saved_path, "wb") as buffer:
+            buffer.write(file_like_object.getvalue())
+        
+        logger.info(f"Successfully saved uploaded file to: {saved_path}")
 
-    # This will hold the final data to be saved in the Image table
-    image_data = {}
-
-    try:
-        # --- Handle VIDEO Files ---
+        # Process Video or Image from the definitive saved_path
         if content_type.startswith("video/"):
-            # 1. Save video file to disk first
-            video_path = utils.save_uploaded_file(file.file, safe_filename)
-
-            # 2. Process video: get metadata and generate a thumbnail
-            video_meta, thumbnail_filename = utils.process_video_file(video_path, filename_stem)
-
-            # 3. Create the VideoSource DB record
-            video_source_data = {
-                "filename": safe_filename,
-                "filepath": safe_filename,
-                "content_type": content_type,
-                "size_bytes": video_path.stat().st_size,
-                **video_meta # Unpack width, height, duration
+            video_meta, thumbnail_filename = utils.process_video_file(saved_path, filename_stem)
+            video_source_obj = await crud.create_video_source(db, video_data={
+                "filename": safe_filename, "filepath": safe_filename, "content_type": content_type,
+                "size_bytes": saved_path.stat().st_size, **video_meta
+            })
+            image_record_data = {
+                "width": video_meta.get('width'), "height": video_meta.get('height'),
+                "aspect_ratio": video_meta['width'] / video_meta['height'] if video_meta.get('height', 0) > 0 else 0,
+                "video_source_id": video_source_obj.id, "size_bytes": None
             }
-            video_source_obj = await crud.create_video_source(db, video_data=video_source_data)
-            
-            # 4. Prepare data for the main Image record
-            image_data = {
-                "width": video_meta.get('width'),
-                "height": video_meta.get('height'),
-                "aspect_ratio": video_meta.get('width') / video_meta.get('height') if video_meta.get('height') > 0 else 0,
-                "video_source_id": video_source_obj.id, # Link to the video source!
-            }
-            
-        # --- Handle IMAGE Files ---
-        else: # Assumed image/
-            content = await file.read()
-            file_bytes_io = io.BytesIO(content)
-
-            saved_path = utils.save_uploaded_file(file_bytes_io, safe_filename)
-            file_bytes_io.seek(0)
-            thumbnail_filename = utils.generate_thumbnail(file_bytes_io, filename_stem, ".jpg") # Standardize thumb extension
-
+        else: # Handle Image
+            thumbnail_filename = utils.generate_thumbnail(saved_path, filename_stem)
             image_meta = utils.parse_metadata_from_image(saved_path)
-            
-            image_data = {
-                "width": image_meta.get('width'),
-                "height": image_meta.get('height'),
-                "aspect_ratio": image_meta.get('width') / image_meta.get('height') if image_meta.get('height', 0) > 0 else 0,
-                "size_bytes": len(content),
+            form_data = {**image_meta, **{k:v for k,v in form_data.items() if v is not None and v != ''}}
+            image_record_data = {
+                "width": image_meta.get('width'), "height": image_meta.get('height'),
+                "aspect_ratio": image_meta['width'] / image_meta['height'] if image_meta.get('height', 0) > 0 else 0,
+                "size_bytes": len(content)
             }
-
-        # --- Populate and Save the final Image record ---
+        
+        # Create final DB record
         final_image_data = {
-            "filename": safe_filename,
-            "original_filename": original_filename,
-            "filepath": safe_filename,
-            "thumbnail_path": thumbnail_filename,
-            "content_type": content_type,
-            "prompt": prompt,
-            "negative_prompt": negative_prompt,
-            "sampler": sampler,
-            "notes": notes,
-            "steps": steps_int,
-            "cfg_scale": cfg_float,
-            "seed": seed_int,
-            "is_nsfw": is_nsfw_bool,
-            "tags": tags,
-            "album_id": album_id_int,
-            **image_data # Add the image/video specific data
+            "filename": safe_filename, "original_filename": original_filename,
+            "filepath": safe_filename, "thumbnail_path": thumbnail_filename,
+            "content_type": content_type, **form_data, **image_record_data
         }
         
-        await crud.create_image(db, image_data=final_image_data)
+        new_image_record = await crud.create_image(db, image_data=final_image_data)
+        
+        # --- Indexing for Visual Search ---
+        vector_service = request.app.state.vector_service
+        if vector_service and not content_type.startswith("video/") and saved_path.exists():
+             logger.info(f"Indexing new image (ID: {new_image_record.id}) for visual search...")
+             # Pass the definitive, final path on disk.
+             vector_service.add_image(image_id=new_image_record.id, image_path=saved_path)
+        
         logger.info(f"Successfully processed and created entry for: {original_filename}")
 
     except Exception as e:
-        logger.error(f"Failed to process file {original_filename}: {e}", exc_info=True)
-        # We should ideally show an error message to the user here
+        logger.error(f"Upload failed for {original_filename}: {e}", exc_info=True)
+        # Clean up partially saved file if something went wrong
+        if saved_path and saved_path.exists():
+            utils.delete_image_files(saved_path.name, None)
         raise HTTPException(status_code=500, detail=f"Failed to process file: {str(e)}")
     finally:
         await file.close()
@@ -285,43 +263,3 @@ def save_uploaded_file(file, filename: str) -> Path:
                 pass
         raise
 
-def process_video_file(video_path: Path, filename_stem: str) -> (dict, str):
-    """
-    Uses FFmpeg to extract metadata and a thumbnail from a video.
-    Returns a dictionary of metadata and the thumbnail filename.
-    """
-    logger.info(f"Processing video file: {video_path}")
-    thumbnail_filename = f"{filename_stem}_thumb.jpg" # Always save video thumbs as jpg
-    thumbnail_filepath = settings.UPLOAD_PATH / thumbnail_filename
-    
-    try:
-        # Probe for video metadata
-        probe = ffmpeg.probe(str(video_path))
-        video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
-        if video_stream is None:
-            raise RuntimeError("No video stream found in the file.")
-
-        metadata = {
-            "width": int(video_stream['width']),
-            "height": int(video_stream['height']),
-            "duration": float(video_stream['duration']),
-        }
-        
-        # Extract the first frame as a thumbnail
-        (
-            ffmpeg
-            .input(str(video_path), ss=0) # Seek to the beginning
-            .output(str(thumbnail_filepath), vframes=1) # Output one frame
-            .overwrite_output()
-            .run(capture_stdout=True, capture_stderr=True)
-        )
-        logger.info(f"Generated video thumbnail: {thumbnail_filepath}")
-        
-        return metadata, thumbnail_filename
-        
-    except ffmpeg.Error as e:
-        logger.error(f"FFmpeg error processing {video_path}: {e.stderr.decode()}")
-        raise  # Re-raise the exception to be handled by the route
-    except Exception as e:
-        logger.error(f"General error processing video {video_path}: {e}")
-        raise

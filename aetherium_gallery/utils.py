@@ -8,18 +8,18 @@ from typing import Optional, Dict, Tuple # Import Optional (and Dict/Tuple which
 import logging
 import re
 import io
+import json 
 import ffmpeg 
 
 logger = logging.getLogger(__name__)
 
-THUMBNAIL_SIZE = (256, 256) # Width, Height
+THUMBNAIL_SIZE = (400, 400) # Width, Height
 
-def generate_safe_filename(original_filename: str) -> (str, str):
-    """Generates a unique, safe filename and returns the stem and extension."""
+def generate_safe_filename(original_filename: str) -> Tuple[str, str, str]: # Corrected type hint
+    """Generates a unique, safe filename and returns the stem, extension, and full name."""
     extension = Path(original_filename).suffix.lower()
-    # Sanitize extension if needed, e.g., ensure it starts with '.'
-    if not extension or len(extension) > 5: # Basic sanity check
-        extension = ".png" # Default or raise error
+    if not extension or len(extension) > 5:
+        extension = ".png"
     unique_id = uuid.uuid4()
     filename_stem = str(unique_id)
     safe_filename = f"{filename_stem}{extension}"
@@ -56,95 +56,60 @@ def save_uploaded_image(file, filename: str) -> Path:
         raise
 
 # ▼▼▼ REPLACE THIS FUNCTION ▼▼▼
-def generate_thumbnail(image_source, filename_stem: str, extension: str) -> Optional[str]:
-    """
-    Generates a thumbnail for the given image.
-    'image_source' can be a Path object or a file-like object (BytesIO).
-    """
-    thumbnail_filename = f"{filename_stem}_thumb{extension}"
+def generate_thumbnail(image_path: Path, filename_stem: str) -> Optional[str]:
+    """Generates a thumbnail for a given image file."""
+    thumbnail_filename = f"{filename_stem}_thumb.jpg"
     thumbnail_filepath = settings.UPLOAD_PATH / thumbnail_filename
     try:
-        # The 'with' statement works correctly on both Path objects and BytesIO
-        with PILImage.open(image_source) as img:
+        with PILImage.open(image_path) as img:
             if img.mode not in ('RGB', 'RGBA', 'L'):
                  img = img.convert('RGB')
-
             img.thumbnail(THUMBNAIL_SIZE)
-            img.save(thumbnail_filepath)
-            logger.info(f"Generated thumbnail: {thumbnail_filepath}")
+            img.save(thumbnail_filepath, "JPEG", quality=90, optimize=True) # Added quality settings
+            logger.info(f"Generated image thumbnail: {thumbnail_filepath}")
             return thumbnail_filename
     except Exception as e:
-        logger.error(f"Error generating thumbnail for {filename_stem}: {e}", exc_info=True)
+        logger.error(f"Error generating image thumbnail for {image_path}: {e}", exc_info=True)
         return None
 
-
-def parse_metadata_from_image(image_source) -> dict:
-    """
-    Parses metadata from an image.
-    'image_source' can be a Path object or a file-like object (BytesIO).
-    """
+def parse_metadata_from_image(image_path: Path) -> dict:
+    """Parses Stable Diffusion and other metadata from an image file."""
     metadata = {}
     try:
-        # The 'with' statement works correctly on both Path objects and BytesIO
-        with PILImage.open(image_source) as img:
-            # We add all the parsing logic from your old `parse_sd_parameters` here
-            # for a unified function.
-            
-            # --- Primary Data ---
-            metadata['width'] = img.width
-            metadata['height'] = img.height
+        with PILImage.open(image_path) as img:
+            metadata['width'], metadata['height'] = img.size
+            param_string = img.info.get('parameters', '') or img.info.get('prompt', '')
 
-            # --- Read PNG Info Chunks (most common for AI images) ---
-            param_string = ""
-            if 'parameters' in img.info:
-                param_string = img.info['parameters']
-            elif 'prompt' in img.info: # Handle ComfyUI style
-                # This is a very basic parse, might need adjustment for complex workflows
-                try:
-                    workflow = json.loads(img.info['prompt'])
-                    # A simplistic attempt to find a prompt node
+            if param_string:
+                try: # Handle ComfyUI JSON format
+                    workflow = json.loads(param_string)
                     for node in workflow.values():
                         if node.get('class_type') == "CLIPTextEncode" and 'text' in node.get('inputs', {}):
                            metadata['prompt'] = node['inputs']['text']
-                           break # Take the first one found
-                    # Fallback to just storing the workflow JSON
-                    if 'prompt' not in metadata:
-                        metadata['notes'] = json.dumps(workflow, indent=2)
-                except json.JSONDecodeError:
-                    metadata['notes'] = img.info['prompt'] # Store as raw text if not valid JSON
-                param_string = metadata.get('notes', '') # Use notes for further parsing
-            
-            # Now we parse the parameter string we found
-            if param_string:
-                # Store the full raw metadata for reference
-                metadata['notes'] = param_string
+                           break
+                    metadata['notes'] = json.dumps(workflow, indent=2)
+                except json.JSONDecodeError: # Handle A1111/InvokeAI text format
+                    metadata['notes'] = param_string
+                    neg_prompt_match = re.search(r"Negative prompt:\s*([\s\S]+?)(?:Steps:|$)", param_string)
+                    if neg_prompt_match:
+                        metadata['prompt'] = param_string[:neg_prompt_match.start()].strip()
+                        metadata['negative_prompt'] = neg_prompt_match.group(1).strip()
+                    else:
+                        metadata['prompt'] = param_string.split("Steps:")[0].strip()
 
-                # Use regex to find key-value pairs
-                neg_prompt_match = re.search(r"Negative prompt:\s*([\s\S]+?)(?:Steps:|$)", param_string)
-                if neg_prompt_match:
-                    full_prompt = param_string[:neg_prompt_match.start()].strip()
-                    metadata['prompt'] = full_prompt
-                    metadata['negative_prompt'] = neg_prompt_match.group(1).strip()
-                else:
-                    full_prompt = param_string.split("Steps:")[0].strip()
-                    metadata['prompt'] = full_prompt
-
-                kv_matches = re.findall(r"(\w+(?: \w+)*):\s*([^,]+)", param_string)
-                for key, value in kv_matches:
-                    key_norm = key.strip().lower().replace(" ", "_")
-                    val_norm = value.strip()
-                    try:
-                        if key_norm == 'steps': metadata['steps'] = int(val_norm)
-                        elif key_norm == 'sampler': metadata['sampler'] = val_norm
-                        elif key_norm == 'cfg_scale': metadata['cfg_scale'] = float(val_norm)
-                        elif key_norm == 'seed': metadata['seed'] = int(val_norm)
-                        elif key_norm == 'model_hash': metadata['model_hash'] = val_norm
-                    except (ValueError, TypeError):
-                        continue # Ignore conversion errors
-    
+                    kv_matches = re.findall(r"(\w+(?: \w+)*):\s*([^,]+)", param_string)
+                    for key, value in kv_matches:
+                        key_norm = key.strip().lower().replace(" ", "_")
+                        val_norm = value.strip()
+                        try:
+                            if key_norm == 'steps': metadata['steps'] = int(val_norm)
+                            elif key_norm == 'sampler': metadata['sampler'] = val_norm
+                            elif key_norm == 'cfg_scale': metadata['cfg_scale'] = float(val_norm)
+                            elif key_norm == 'seed': metadata['seed'] = int(val_norm)
+                            elif key_norm == 'model_hash': metadata['model_hash'] = val_norm
+                        except (ValueError, TypeError): continue
     except Exception as e:
-        logger.warning(f"Could not read metadata from image: {e}")
-
+        logger.warning(f"Could not read metadata from {image_path}: {e}")
     return metadata
 
 def save_uploaded_file(file, filename: str) -> Path:
@@ -178,45 +143,31 @@ def save_uploaded_file(file, filename: str) -> Path:
                 pass
         raise
 
-def process_video_file(video_path: Path, filename_stem: str) -> (dict, str):
-    """
-    Uses FFmpeg to extract metadata and a thumbnail from a video.
-    Returns a dictionary of metadata and the thumbnail filename.
-    """
+def process_video_file(video_path: Path, filename_stem: str) -> tuple[dict, str]:
+    # ... (This function is fine, but replacing ensures consistency)
     logger.info(f"Processing video file: {video_path}")
-    thumbnail_filename = f"{filename_stem}_thumb.jpg" # Always save video thumbs as jpg
-    thumbnail_filepath = settings.UPLOAD_PATH / thumbnail_filename
-    
+    output_path = video_path.with_suffix('.transcoded.mp4')
     try:
-        # Probe for video metadata
         probe = ffmpeg.probe(str(video_path))
-        video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
-        if video_stream is None:
-            raise RuntimeError("No video stream found in the file.")
-
-        metadata = {
-            "width": int(video_stream['width']),
-            "height": int(video_stream['height']),
-            "duration": float(video_stream['duration']),
-        }
-        
-        # Extract the first frame as a thumbnail
-        (
-            ffmpeg
-            .input(str(video_path), ss=0) # Seek to the beginning
-            .output(str(thumbnail_filepath), vframes=1) # Output one frame
-            .overwrite_output()
-            .run(capture_stdout=True, capture_stderr=True)
-        )
-        logger.info(f"Generated video thumbnail: {thumbnail_filepath}")
-        
+        video_stream = next((s for s in probe['streams'] if s['codec_type'] == 'video'), None)
+        if video_stream is None: raise RuntimeError("No video stream found.")
+        codec_name = video_stream.get('codec_name')
+        if codec_name != 'h264':
+            logger.info(f"Transcoding video from {codec_name} to h264...")
+            (ffmpeg.input(str(video_path)).output(str(output_path), vcodec='libx264', acodec='aac', pix_fmt='yuv420p', preset='fast').overwrite_output().run(capture_stdout=True, capture_stderr=True))
+            os.replace(output_path, video_path)
+            probe = ffmpeg.probe(str(video_path))
+            video_stream = next((s for s in probe['streams'] if s['codec_type'] == 'video'), None)
+        thumbnail_filename = f"{filename_stem}_thumb.jpg"
+        thumbnail_filepath = settings.UPLOAD_PATH / thumbnail_filename
+        (ffmpeg.input(str(video_path), ss=0).output(str(thumbnail_filepath), vframes=1).overwrite_output().run(capture_stdout=True, capture_stderr=True))
+        metadata = {"width": int(video_stream.get('width',0)), "height": int(video_stream.get('height',0)), "duration": float(video_stream.get('duration',0.0))}
         return metadata, thumbnail_filename
-        
     except ffmpeg.Error as e:
-        logger.error(f"FFmpeg error processing {video_path}: {e.stderr.decode()}")
-        raise  # Re-raise the exception to be handled by the route
+        if output_path.exists(): os.remove(output_path)
+        raise
     except Exception as e:
-        logger.error(f"General error processing video {video_path}: {e}")
+        if output_path.exists(): os.remove(output_path)
         raise
 
 def delete_image_files(filename: str, thumbnail_filename: Optional[str]):

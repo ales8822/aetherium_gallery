@@ -1,0 +1,31 @@
+<!-- templates/similar_results.html -->
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<h1>Visually Similar Images</h1>
+
+<div class="similar-source-container">
+    <div class="similar-source-image">
+        <img src="{{ url_for('uploads', path=source_image.thumbnail_path) }}" alt="Source Image">
+    </div>
+    <div class="similar-source-text">
+        <p>Showing results similar to:</p>
+        <h3>{{ source_image.original_filename }}</h3>
+    </div>
+</div>
+
+
+{% if images %}
+    <p class="search-summary">
+        Found <strong>{{ image_count }}</strong> similar results.
+    </p>
+    {% include 'partials/gallery_grid.html' %}
+{% else %}
+    <p>No visually similar images were found. This may happen if the source image has not been indexed yet.</p>
+{% endif %}
+
+{% include 'partials/bulk_actions_panel.html' %}
+
+{% endblock %}

@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     UPLOAD_FOLDER: str = "uploads"
     SECRET_KEY: str = "default-secret-should-be-overridden"
-
+    DEBUG: bool = False 
     # Make UPLOAD_FOLDER an absolute path
     @property
     def UPLOAD_PATH(self) -> Path:

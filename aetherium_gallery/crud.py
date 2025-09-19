@@ -479,3 +479,12 @@ async def get_gallery_statistics(db: AsyncSession) -> dict:
     }
     
     return stats
+
+async def get_images_by_ids(db: AsyncSession, image_ids: List[int]) -> List[models.Image]:
+    if not image_ids:
+        return []
+    result = await db.execute(
+        select(models.Image).filter(models.Image.id.in_(image_ids))
+        .options(selectinload(models.Image.video_source)) # Eager load for display
+    )
+    return result.scalars().all()
