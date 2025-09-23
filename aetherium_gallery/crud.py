@@ -78,12 +78,18 @@ async def update_image(db: AsyncSession, db_image: models.Image, image_update: s
     """Update an existing image record, including its tags."""
     update_data = image_update.model_dump(exclude_unset=True)
     
-    # Handle tags separately
+    # Handle tags separately. This logic will REPLACE existing tags, which is
+    # what's needed for both the editor and the caption generator.
     if 'tags' in update_data:
         tag_names_str = update_data.pop('tags')
         tag_names = [name.strip().lower() for name in tag_names_str.split(',') if name.strip()]
-        tags = await get_or_create_tags_by_name(db, tag_names)
-        db_image.tags = tags
+        
+        # If tag_names is not an empty list, process them. Otherwise, clear the tags.
+        if tag_names:
+            tags = await get_or_create_tags_by_name(db, tag_names)
+            db_image.tags = tags
+        else:
+            db_image.tags = [] # This allows clearing all tags
 
     for key, value in update_data.items():
         setattr(db_image, key, value)

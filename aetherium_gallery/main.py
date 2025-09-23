@@ -16,6 +16,8 @@ from .services.vector_service import VectorService
 from .routers import frontend, images, albums, stats
 from .routers.api import albums as albums_api
 from .routers.api import images_api as images_api
+from .routers.api import generation as generation_api # New import
+from .services.caption_service import CaptionService
 
 # --- Logging Setup ---
 logging.basicConfig(level=logging.INFO)
@@ -50,6 +52,13 @@ async def lifespan(app: FastAPI):
         app.state.vector_service = None
         logger.error("FATAL: Vector Service failed to initialize.", exc_info=True)
 
+    try:
+        app.state.caption_service = CaptionService()
+        logger.info("Caption Service initialized successfully.")
+    except Exception as e:
+        app.state.caption_service = None
+        logger.error("FATAL: Caption Service failed to initialize.", exc_info=True)
+
     yield  # Application runs here
 
     # --- Shutdown Logic ---
@@ -71,7 +80,7 @@ app.include_router(images.upload_router)
 app.include_router(images.router)
 app.include_router(albums_api.router)
 app.include_router(images_api.router)
-
+app.include_router(generation_api.router) # Include the new router
 # --- Generic Exception Handler ---
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):

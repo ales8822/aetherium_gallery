@@ -143,6 +143,9 @@
                 </div>
             </div>
             {% if not image.video_source %}
+            <button type="button" id="generate-caption-button" class="button" title="Generate Prompt & Tags with AI">✍️ Generate</button>
+            {% endif %}
+            {% if not image.video_source %}
             <a href="{{ url_for('find_similar', image_id=image.id) }}" class="button" title="Find Visually Similar Images">Find Similar</a>
             {% endif %}
             <!-- Delete button, always visible -->
@@ -178,12 +181,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const editForm = document.getElementById('edit-form');
     const statusMessage = document.getElementById('status-message');
     const imageId = editorPanel.dataset.imageId;
-
+    const generateCaptionButton = document.getElementById('generate-caption-button');
     // --- Event Listeners ---
     editButton.addEventListener('click', enterEditMode);
     cancelButton.addEventListener('click', leaveEditMode);
     saveButton.addEventListener('click', saveChanges);
-
+    if(generateCaptionButton) {
+        generateCaptionButton.addEventListener('click', handleGenerateCaption);
+    }
     // --- Functions ---
 
     // --- Click-to-Copy Functionality ---
@@ -228,6 +233,41 @@ document.addEventListener('DOMContentLoaded', function () {
         statusMessage.textContent = '';
         // Note: We don't reset the form on cancel in case the user
         // wants to re-enter edit mode without losing their changes.
+    }
+
+    function handleGenerateCaption() {
+        if (!confirm("This will overwrite the current prompt and add new tags. Are you sure you want to continue?")) {
+            return;
+        }
+
+        const originalButtonHtml = generateCaptionButton.innerHTML;
+        generateCaptionButton.innerHTML = "Generating...";
+        generateCaptionButton.disabled = true;
+        statusMessage.textContent = 'Requesting AI caption... This may take a moment.';
+        statusMessage.style.color = '#e0e0e0';
+
+        fetch(`/api/generation/caption/${imageId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => { throw new Error(err.detail || 'Unknown error'); });
+            }
+            return response.json();
+        })
+        .then(data => {
+            statusMessage.textContent = 'Successfully generated and saved! Reloading...';
+            statusMessage.style.color = '#81c784';
+            setTimeout(() => { window.location.reload(); }, 1500);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            statusMessage.textContent = `Error generating caption: ${error.message}`;
+            statusMessage.style.color = '#e57373';
+            generateCaptionButton.innerHTML = originalButtonHtml;
+            generateCaptionButton.disabled = false;
+        });
     }
 
     function saveChanges() {
