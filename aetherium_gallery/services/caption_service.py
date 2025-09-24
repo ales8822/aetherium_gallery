@@ -102,7 +102,7 @@ class CaptionService:
             logger.error(f"Failed to generate base description for {image_path.name}. Aborting.")
             return None
         
-        quality_prefix = "masterpiece, best quality, 8k, ultra-detailed, sharp focus"
+        quality_prefix = ""
         full_prompt = f"{quality_prefix}, {base_description}"
         negative_prompt = "low quality, worst quality, blurry, ugly, deformed, disfigured, bad anatomy"
 
