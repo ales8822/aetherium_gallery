@@ -1,6 +1,6 @@
-# aetherium_gallery/services/caption_service.py (FINAL GRADIO_CLIENT VERSION)
-import asyncio # ▼▼▼ ADD THIS IMPORT ▼▼▼
-from fastapi.concurrency import run_in_threadpool # ▼▼▼ ADD THIS IMPORT ▼▼▼
+# aetherium_gallery/services/caption_service.py (UPDATED)
+import asyncio
+from fastapi.concurrency import run_in_threadpool
 import google.generativeai as genai
 from PIL import Image
 from pathlib import Path
@@ -8,12 +8,10 @@ import logging
 import os
 import time
 
-# Import the official client library
 from gradio_client import Client, handle_file
 
 logger = logging.getLogger(__name__)
 
-# We no longer need the direct API URLs, just the name of the Hugging Face Space
 HF_SPACE_NAME = "SmilingWolf/wd-tagger"
 
 class CaptionService:
@@ -32,7 +30,6 @@ class CaptionService:
                 self.gemini_model = None
                 logger.error(f"Failed to configure Gemini: {e}")
 
-        # Initialize the Gradio client for the tagger
         try:
             self.tagger_client = Client(HF_SPACE_NAME)
             logger.info(f"Gradio client for '{HF_SPACE_NAME}' initialized successfully.")
@@ -45,10 +42,8 @@ class CaptionService:
         try:
             logger.info(f"Sending request to Gemini for {image_path.name}...")
             img = Image.open(image_path)
-            prompt = "Describe this image in a detailed, single paragraph..."
+            prompt = "Describe this image in a detailed, single paragraph, focusing on the visual elements and style." # Refined prompt
             
-            # The gemini library's generate_content is already awaitable!
-            # We don't even need run_in_threadpool for this one.
             response = await self.gemini_model.generate_content_async([prompt, img], request_options={'timeout': 120})
             
             return response.text.strip()
@@ -57,17 +52,12 @@ class CaptionService:
             return None
 
     async def _generate_tags_from_wd14(self, image_path: Path) -> str | None:
-        """
-        Uses the official Gradio Client to get tags, running the blocking
-        call in a separate thread to avoid freezing the server.
-        """
         if not self.tagger_client:
             logger.error("WD14 Tagger client not available.")
             return None
             
         logger.info(f"Sending request to WD14 Tagger for {image_path.name}...")
         try:
-            # This is the blocking function we want to run in a thread
             def do_predict():
                 result = self.tagger_client.predict(
                     image=handle_file(str(image_path)),
@@ -82,7 +72,6 @@ class CaptionService:
                     return ", ".join(final_tags)
                 return None
 
-            # Use FastAPI's utility to run the sync function in an async context
             tag_result = await run_in_threadpool(do_predict)
             logger.info("Successfully received tags from WD14 Tagger.")
             return tag_result
@@ -91,12 +80,21 @@ class CaptionService:
             logger.error(f"Error communicating with Gradio client for WD14 Tagger: {e}", exc_info=True)
             return None
 
+    # ▼▼▼ NEW PUBLIC METHOD ▼▼▼
+    async def generate_gemini_description(self, image_path: Path) -> str | None:
+        """Public method to generate only the Gemini description."""
+        return await self._generate_description_from_gemini(image_path)
+
+    # ▼▼▼ NEW PUBLIC METHOD ▼▼▼
+    async def generate_wd14_tags(self, image_path: Path) -> str | None:
+        """Public method to generate only the WD14 tags."""
+        return await self._generate_tags_from_wd14(image_path)
+    
+    # --- This original method can remain unchanged ---
     async def generate_caption(self, image_path: Path) -> dict | None:
-        # Now that the helpers are true async functions, this works perfectly.
         description_task = asyncio.create_task(self._generate_description_from_gemini(image_path))
         tags_task = asyncio.create_task(self._generate_tags_from_wd14(image_path))
         
-        # await the results from our concurrent tasks
         base_description = await description_task
         tags = await tags_task
         

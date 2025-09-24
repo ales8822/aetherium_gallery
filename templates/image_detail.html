@@ -1,4 +1,4 @@
-<!-- templates/image_detail.html (CORRECTED FINAL VERSION) -->
+<!-- templates/image_detail.html (UPDATED with Selective Generation) -->
 {% extends "base.html" %}
 
 {% block title %}{{ page_title }}{% endblock %}
@@ -10,12 +10,28 @@
 .tag-list li a{display:inline-block;background-color:#444;color:#e0e0e0;padding:.2rem .6rem;border-radius:4px;font-size:.85em;text-decoration:none;border:1px solid #555;transition:all .2s ease}
 .tag-list li a:hover{background-color:#64b5f6;color:#111;border-color:#64b5f6}
 
-/* --- Styles for Click-to-Copy --- */
+/* ▼▼▼ UPDATED STYLES FOR INLINE BUTTONS ▼▼▼ */
 .dd-content{display:flex;align-items:center;gap:8px;word-break:break-all}
-.copy-button{background-color:transparent;border:none;color:#888;cursor:pointer;padding:2px;border-radius:4px;display:flex;align-items:center;flex-shrink:0;transition:color .2s ease}
-.copy-button:hover{color:#64b5f6}
-.copy-button svg{fill:currentColor;width:18px;height:18px}
-.metadata-editor.edit-mode .copy-button{display:none}
+.copy-button, .generate-inline-button {
+    background-color:transparent;
+    border:none;
+    color:#888;
+    cursor:pointer;
+    padding:2px;
+    border-radius:4px;
+    display:flex;
+    align-items:center;
+    flex-shrink:0;
+    transition:all .2s ease
+}
+.copy-button:hover, .generate-inline-button:hover { color:#64b5f6 }
+.copy-button:disabled, .generate-inline-button:disabled { color:#555; cursor: not-allowed; }
+.copy-button svg, .generate-inline-button svg { fill:currentColor; width:18px; height:18px }
+.generate-inline-button[data-source="gemini"] svg { width: 24px; height: 24px; }
+.metadata-editor.edit-mode .copy-button, 
+.metadata-editor.edit-mode .generate-inline-button { display:none }
+.generate-inline-button.loading svg { animation: spin 1s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 </style>
 {% endblock %}
 
@@ -24,23 +40,20 @@
 
 <div class="image-detail-container">
     <div class="image-view">
-    {% if image.video_source %}
-        <!-- If it's a video, render the HTML5 video player -->
-        <video controls autoplay muted loop playsinline
-            poster="{{ url_for('uploads', path=image.thumbnail_path) }}"
-            style="width: 100%; height: auto; border-radius: 8px;">
+        {% if image.video_source %}
+        <video controls autoplay muted loop playsinline poster="{{ url_for('uploads', path=image.thumbnail_path) }}" style="width: 100%; height: auto; border-radius: 8px;">
             <source src="{{ url_for('uploads', path=image.video_source.filepath) }}" type="{{ image.video_source.content_type }}">
             Your browser does not support the video tag.
         </video>
-    {% else %}
-        <!-- Otherwise, just show the image -->
+        {% else %}
         <img src="{{ url_for('uploads', path=image.filepath) }}" alt="{{ image.original_filename or 'Image' }}" />
-    {% endif %}
-</div>
+        {% endif %}
+    </div>
 
     <div id="metadata-editor-panel" class="metadata-panel metadata-editor" data-image-id="{{ image.id }}">
         <h2>Metadata</h2>
         <form id="edit-form">
+            
             <dl>
                 <!-- Static (Non-Editable) Fields -->
                 <dt>Filename:</dt>
@@ -86,6 +99,12 @@
                             <span class="copy-target">No tags assigned.</span>
                         {% endif %}
                         <button type="button" class="copy-button" title="Copy Tags"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg></button>
+                        <!-- ▼▼▼ NEW TAGS GENERATION BUTTON ▼▼▼ -->
+                        {% if not image.video_source %}
+                        <button type="button" class="generate-inline-button" data-source="wd14" title="Generate Tags with WD14 Tagger">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" d="M0 0h24v24H0z"/><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41s-.22-1.05-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/></svg>
+                        </button>
+                        {% endif %}
                     </div>
                     <input type="text" name="tags" class="form-control" value="{{ image.tags | map(attribute='name') | join(', ') }}">
                 </dd>
@@ -95,6 +114,11 @@
                     <div class="plain-text dd-content">
                         <pre class="copy-target">{{ image.prompt or 'N/A' }}</pre>
                         <button type="button" class="copy-button" title="Copy Prompt"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg></button>
+                        <!-- ▼▼▼ NEW PROMPT GENERATION BUTTON ▼▼▼ -->
+                        {% if not image.video_source %}
+                        <button type="button" class="generate-inline-button" data-source="gemini" title="Generate Description with Gemini">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M480-80l114-236 236-114-236-114-114-236-114 236L80-530l236 114 114 236Zm0-210L394-460l-170-86 170-86 86-170 86 170 170 86-170 86-86 170Z"/></svg>                        </button>
+                        {% endif %}
                     </div>
                     <textarea name="prompt" class="form-control" rows="5">{{ image.prompt or '' }}</textarea>
                 </dd>
@@ -110,7 +134,57 @@
                     <textarea name="negative_prompt" class="form-control" rows="3">{{ image.negative_prompt or '' }}</textarea>
                 </dd>
                 
-                <!-- ... Repeat for Seed, Steps, Sampler, etc. ... -->
+                 <dt>Seed:</dt>
+                <dd>
+                    <div class="metadata-field-wrapper">
+                        <span class="plain-text copy-target">{{ image.seed if image.seed is not none else 'N/A' }}</span>
+                        <button class="copy-button" type="button" title="Copy Seed">
+                            <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
+                                <path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <input type="text" name="seed" class="form-control" value="{{ image.seed or '' }}">
+                </dd>
+                
+                <dt>Steps:</dt>
+                <dd>
+                    <div class="metadata-field-wrapper">
+                        <span class="plain-text copy-target">{{ image.steps if image.steps is not none else 'N/A' }}</span>
+                        <button class="copy-button" type="button" title="Copy Steps">
+                            <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
+                                <path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <input type="number" name="steps" class="form-control" value="{{ image.steps or '' }}">
+                </dd>
+
+                <dt>CFG Scale:</dt>
+                <dd>
+                    <div class="metadata-field-wrapper">
+                        <span class="plain-text copy-target">{{ image.cfg_scale if image.cfg_scale is not none else 'N/A' }}</span>
+                        <button class="copy-button" type="button" title="Copy CFG Scale">
+                            <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
+                                <path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <input type="number" step="0.1" name="cfg_scale" class="form-control" value="{{ image.cfg_scale or '' }}">
+                </dd>
+
+                <dt>Sampler:</dt>
+                <dd>
+                    <div class="metadata-field-wrapper">
+                        <span class="plain-text copy-target">{{ image.sampler or 'N/A' }}</span>
+                        <button class="copy-button" type="button" title="Copy Sampler">
+                            <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 0 24 24" width="18px" fill="currentColor">
+                                <path d="M0 0h24v24H0V0z" fill="none"/><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <input type="text" name="sampler" class="form-control" value="{{ image.sampler or '' }}">
+                </dd>
 
                 <dt>Notes:</dt>
                 <dd>
@@ -142,9 +216,7 @@
                     <button type="button" id="cancel-button" class="cancel-button">Cancel</button>
                 </div>
             </div>
-            {% if not image.video_source %}
-            <button type="button" id="generate-caption-button" class="button" title="Generate Prompt & Tags with AI">✍️ Generate</button>
-            {% endif %}
+
             {% if not image.video_source %}
             <a href="{{ url_for('find_similar', image_id=image.id) }}" class="button" title="Find Visually Similar Images">Find Similar</a>
             {% endif %}
@@ -181,49 +253,80 @@ document.addEventListener('DOMContentLoaded', function () {
     const editForm = document.getElementById('edit-form');
     const statusMessage = document.getElementById('status-message');
     const imageId = editorPanel.dataset.imageId;
-    const generateCaptionButton = document.getElementById('generate-caption-button');
     // --- Event Listeners ---
     editButton.addEventListener('click', enterEditMode);
     cancelButton.addEventListener('click', leaveEditMode);
     saveButton.addEventListener('click', saveChanges);
-    if(generateCaptionButton) {
-        generateCaptionButton.addEventListener('click', handleGenerateCaption);
-    }
-    // --- Functions ---
 
-    // --- Click-to-Copy Functionality ---
-    editorPanel.addEventListener('click', function (event) {
-        // Find the closest copy button that was clicked
+    // ▼▼▼ NEW: Using event delegation for all actions inside the editor panel ▼▼▼
+    editorPanel.addEventListener('click', function(event) {
+        const generateButton = event.target.closest('.generate-inline-button');
         const copyButton = event.target.closest('.copy-button');
+        const editButton = event.target.closest('#edit-button');
+        const saveButton = event.target.closest('#save-button');
+        const cancelButton = event.target.closest('#cancel-button');
         
-        // If the click wasn't on a copy button, do nothing.
-        if (!copyButton) {
-            return;
-        }
-
-        // Find the sibling or parent element with the text to be copied
-        const wrapper = copyButton.closest('dd');
-        const targetElement = wrapper.querySelector('.copy-target');
-        
-        if (targetElement) {
-            const textToCopy = targetElement.innerText || targetElement.textContent;
-            
-            navigator.clipboard.writeText(textToCopy)
-                .then(() => {
-                    // Provide visual feedback
-                    const originalText = copyButton.innerHTML;
-                    copyButton.innerHTML = 'Copied!';
-                    setTimeout(() => {
-                        copyButton.innerHTML = originalText;
-                    }, 1500); // Revert back after 1.5 seconds
-                })
-                .catch(err => {
-                    console.error('Failed to copy text: ', err);
-                    alert('Failed to copy text.');
-                });
+        if (generateButton) {
+            handleAIGeneration(generateButton);
+        } else if (copyButton) {
+            handleCopy(copyButton);
+        } else if (editButton) {
+            enterEditMode();
+        } else if (cancelButton) {
+            leaveEditMode();
+        } else if (saveButton) {
+            saveChanges();
         }
     });
     
+    // ▼▼▼ NEW: Modular AI generation handler ▼▼▼
+    function handleAIGeneration(buttonElement) {
+        const source = buttonElement.dataset.source;
+        const isPrompt = source === 'gemini';
+        const message = isPrompt 
+            ? "This will overwrite the current prompt with a new AI-generated description. Are you sure?"
+            : "This will add new AI-generated tags to the existing ones. Are you sure?";
+
+        if (!confirm(message)) return;
+        
+        const originalIconSVG = buttonElement.innerHTML;
+        const loadingSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" d="M0 0h24v24H0z"/><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" opacity=".3"/><path d="M12 4a8 8 0 0 1 0 16z"/></svg>`;
+        buttonElement.innerHTML = loadingSVG; // Replace icon with a simple spinner for loading
+        buttonElement.classList.add('loading');
+        buttonElement.disabled = true;
+
+        statusMessage.textContent = `Requesting AI ${isPrompt ? 'description' : 'tags'}... This can take a moment.`;
+        statusMessage.style.color = '#e0e0e0';
+
+        fetch(`/api/generation/caption/${imageId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source: source }) // Pass the specific source
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => { throw new Error(err.detail || 'Unknown error'); });
+            }
+            return response.json();
+        })
+        .then(data => {
+            statusMessage.textContent = 'Successfully generated and saved! Reloading...';
+            statusMessage.style.color = '#81c784';
+            setTimeout(() => { window.location.reload(); }, 1000);
+        })
+        .catch(error => {
+            console.error('Error generating AI content:', error);
+            statusMessage.textContent = `Error: ${error.message}`;
+            statusMessage.style.color = '#e57373';
+        })
+        .finally(() => {
+            // Restore button even on failure
+            buttonElement.innerHTML = originalIconSVG;
+            buttonElement.classList.remove('loading');
+            buttonElement.disabled = false;
+        });
+    }
+
     function enterEditMode() {
         editorPanel.classList.add('edit-mode');
     }
