@@ -20,7 +20,8 @@
                 <div id="preview-text" class="preview-text">Select an image or video to see a preview</div>
                 <div id="loading-spinner" class="loading-spinner" style="display: none;">
                     <div class="spinner"></div>
-                    Extracting Metadata...
+                    <!-- Wrap the text in a div with an ID for easy selection -->
+                    <div id="loading-spinner-text">Extracting Metadata...</div>
                 </div>
             </div>
         </div>
@@ -69,6 +70,24 @@
                 <label for="tags">Tags (comma-separated)</label>
                 <input type="text" id="tags" name="tags" placeholder="e.g. character, cyberpunk, futuristic">
             </div>
+            <!-- ▼▼▼ ADD THIS NEW 'AI GENERATION' SECTION ▼▼▼ -->
+            <div id="ai-generation-group" class="form-group form-group-generation" style="display: none;">
+                <label class="generation-label">AI Generation Options</label>
+                <button type="button" id="ai-generate-button" class="button-secondary">✨ Generate</button>
+                <div class="form-group-checkbox">
+                    <input type="checkbox" id="generate-all" name="generate_all">
+                    <label for="generate-all"><strong>Generate Both</strong></label>
+                </div>
+                <div class="form-group-checkbox sub-option">
+                    <input type="checkbox" id="generate-description" name="generate_description" value="on">
+                    <label for="generate-description">Generate Description (Gemini)</label>
+                </div>
+                <div class="form-group-checkbox sub-option">
+                    <input type="checkbox" id="generate-tags" name="generate_tags" value="on">
+                    <label for="generate-tags">Generate Tags (WD14)</label>
+                </div>
+            </div>
+
             <div class="form-group">
                 <label for="album_id">Add to Album (Optional)</label>
                 <select name="album_id" id="album_id">
@@ -93,70 +112,127 @@
 
 </form>
 
-<!-- NEW JAVASCRIPT BLOCK -->
+
 <script>
 document.addEventListener("DOMContentLoaded", () => {
+    // --- Get all DOM Elements ---
     const uploadInput = document.getElementById("image-upload");
     const previewContainer = document.getElementById("preview-container");
-    const previewImage = document.getElementById("image-preview");
     const previewText = document.getElementById("preview-text");
     const loadingSpinner = document.getElementById("loading-spinner");
+    const loadingSpinnerText = document.getElementById("loading-spinner-text"); // <-- Get the new element
     const submitButton = document.getElementById("submit-button");
     const form = document.getElementById("upload-form");
+    const aiGenerationGroup = document.getElementById("ai-generation-group");
+    const aiGenerateButton = document.getElementById("ai-generate-button");
+    const genAllCheckbox = document.getElementById("generate-all");
+    const genDescCheckbox = document.getElementById("generate-description");
+    const genTagsCheckbox = document.getElementById("generate-tags");
 
-     uploadInput.addEventListener("change", (event) => {
+    // --- Event Listeners ---
+    uploadInput.addEventListener("change", handleFileSelection);
+    aiGenerateButton.addEventListener("click", handleAIGeneration);
+    
+    // Checkbox logic (unchanged)
+    genAllCheckbox.addEventListener('change', () => {
+        genDescCheckbox.checked = genAllCheckbox.checked;
+        genTagsCheckbox.checked = genAllCheckbox.checked;
+    });
+    [genDescCheckbox, genTagsCheckbox].forEach(cb => {
+        cb.addEventListener('change', () => {
+            genAllCheckbox.checked = genDescCheckbox.checked && genTagsCheckbox.checked;
+        });
+    });
+
+    // --- Main Functions ---
+    function handleFileSelection(event) {
         const file = event.target.files[0];
-        if (!file) {
-            submitButton.disabled = true;
-            return;
-        }
-
-        // --- DYNAMIC PREVIEW GENERATION (CORRECTED) ---
-        const objectURL = URL.createObjectURL(file);
+        if (!file) { submitButton.disabled = true; return; }
         
-        // Find and remove any OLD media preview element if one exists
-        const existingPreview = previewContainer.querySelector('.media-preview');
-        if (existingPreview) {
-            existingPreview.remove();
-        }
-        
-        // Hide the initial "Select an image..." text
-        previewText.style.display = 'none';
-
-        let mediaElement;
-        if (file.type.startsWith('image/')) {
-            // If it's an image, create an <img> element
-            mediaElement = document.createElement('img');
-            mediaElement.src = objectURL;
-            mediaElement.alt = 'Image Preview';
-
-        } else if (file.type.startsWith('video/')) {
-            // If it's a video, create a <video> element
-            mediaElement = document.createElement('video');
-            mediaElement.src = objectURL;
-            mediaElement.autoplay = true;
-            mediaElement.muted = true;
-            mediaElement.loop = true;
-            mediaElement.playsInline = true;
-        }
-
-        if(mediaElement) {
-            mediaElement.className = 'media-preview';
-            // Insert the new media element BEFORE the spinner
-            previewContainer.insertBefore(mediaElement, loadingSpinner);
-        }
-
+        updatePreview(file);
         form.elements['original_filename'].value = file.name;
 
-        // --- Metadata logic ---
-        
-        // If it's a video, we don't extract metadata. Just enable the button.
-        if (!file.type.startsWith('image/')) {
+        if (file.type.startsWith('image/')) {
+            aiGenerationGroup.style.display = 'block';
+            fetchAndFillMetadata(file);
+        } else {
+            aiGenerationGroup.style.display = 'none';
             submitButton.disabled = false;
-            return; // Exit here.
         }
+    }
 
-        // If it IS an image, show spinner and fetch metadata.
+    async function handleAIGeneration() {
+        const file = uploadInput.files[0];
+        const doDesc = genDescCheckbox.checked;
+        const doTags = genTagsCheckbox.checked;
+
+        if (!file || (!doDesc && !doTags)) {
+            alert("Please select a file and choose at least one generation option.");
+            return;
+        }
+        
+        // ▼▼▼ THIS IS THE FIX ▼▼▼
+        // Use the new ID to safely change the text
+        loadingSpinnerText.textContent = 'Generating with AI...';
+        loadingSpinner.style.display = 'flex';
+        aiGenerateButton.disabled = true;
+        submitButton.disabled = true;
+        
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("generate_description", doDesc);
+        formData.append("generate_tags", doTags);
+
+        try {
+            const response = await fetch("/api/generation/generate-for-upload", {
+                method: "POST",
+                body: formData,
+            });
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || "Unknown error during AI generation.");
+            }
+            const data = await response.json();
+
+            if (data.prompt) {
+                form.elements['prompt'].value = data.prompt;
+            }
+            if (data.tags) {
+                const existingTags = new Set((form.elements['tags'].value || '').split(',').map(t => t.trim()).filter(Boolean));
+                const newTags = new Set(data.tags.split(',').map(t => t.trim()).filter(Boolean));
+                const combinedTags = Array.from(new Set([...existingTags, ...newTags])).sort().join(', ');
+                form.elements['tags'].value = combinedTags;
+            }
+            
+        } catch (error) {
+            console.error("AI Generation failed:", error);
+            alert(`AI Generation failed: ${error.message}`);
+        } finally {
+            loadingSpinner.style.display = 'none';
+            aiGenerateButton.disabled = false;
+            submitButton.disabled = false;
+        }
+    }
+
+    // --- Helper Functions ---
+    function updatePreview(file) {
+        const objectURL = URL.createObjectURL(file);
+        const existingPreview = previewContainer.querySelector('.media-preview');
+        if (existingPreview) existingPreview.remove();
+        previewText.style.display = 'none';
+
+        let mediaElement = document.createElement(file.type.startsWith('image/') ? 'img' : 'video');
+        mediaElement.src = objectURL;
+        if (mediaElement.tagName === 'VIDEO') {
+            Object.assign(mediaElement, { autoplay: true, muted: true, loop: true, playsInline: true });
+        }
+        mediaElement.className = 'media-preview';
+        previewContainer.insertBefore(mediaElement, loadingSpinner);
+    }
+    
+    function fetchAndFillMetadata(file) {
+        // Also update the text here for consistency
+        loadingSpinnerText.textContent = 'Extracting Metadata...';
         loadingSpinner.style.display = 'flex';
         submitButton.disabled = true;
         const formData = new FormData();
@@ -174,18 +250,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 form.elements['sampler'].value = data.sampler || '';
                 form.elements['cfg_scale'].value = data.cfg_scale || '';
                 form.elements['seed'].value = data.seed || '';
-                
-                // Hide the spinner and enable submission
-                loadingSpinner.style.display = 'none'; // <-- THIS NOW WORKS RELIABLY
-                submitButton.disabled = false;
             })
             .catch(error => {
                 console.error("Metadata extraction failed:", error);
                 alert(`Could not get metadata: ${error.message}. You can still upload manually.`);
+            })
+            .finally(() => {
                 loadingSpinner.style.display = 'none';
                 submitButton.disabled = false;
             });
-    });
+    }
 });
 </script>
 
@@ -245,6 +319,30 @@ document.addEventListener("DOMContentLoaded", () => {
     border-radius: 4px;
     box-sizing: border-box;
     }
+
+    .form-group-generation {
+        background-color: #3f3f3f;
+        padding: 1rem;
+        border-radius: 4px;
+        margin-top: 1.5rem;
+    }
+    .form-group-generation .generation-label {
+        font-weight: bold;
+        color: #e0e0e0;
+        margin-bottom: 0.25rem;
+    }
+     .form-group-generation .generation-note {
+        font-size: 0.8em;
+        color: #aaa;
+        margin-top: 0;
+        margin-bottom: 1rem;
+    }
+    .form-group-generation .sub-option {
+        margin-left: 1rem; /* Indent sub-options */
+        background-color: transparent;
+        padding: 0.4rem 0;
+    }
+
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     .form-row { display: flex; gap: 1rem; }
     .form-group { flex-grow: 1; margin-bottom: 1rem; }

@@ -13,6 +13,7 @@ from .. import crud, models, schemas, utils
 from ..database import get_db
 from ..config import settings
 from pathlib import Path
+import asyncio
 
 
 router = APIRouter(
@@ -39,7 +40,8 @@ async def handle_staged_upload(
     steps: Optional[str] = Form(None), sampler: Optional[str] = Form(None),
     cfg_scale: Optional[str] = Form(None), seed: Optional[str] = Form(None),
     notes: Optional[str] = Form(None), is_nsfw: Optional[str] = Form(None),
-    tags: Optional[str] = Form(None), album_id: Optional[str] = Form(None)
+    tags: Optional[str] = Form(None), album_id: Optional[str] = Form(None),
+ 
 ):
     content_type = file.content_type
     if not (content_type and (content_type.startswith("image/") or content_type.startswith("video/"))):
@@ -73,6 +75,7 @@ async def handle_staged_upload(
             buffer.write(file_like_object.getvalue())
         
         logger.info(f"Successfully saved uploaded file to: {saved_path}")
+        
 
         # Process Video or Image from the definitive saved_path
         if content_type.startswith("video/"):

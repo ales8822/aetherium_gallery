@@ -1,11 +1,15 @@
 # aetherium_gallery/routers/api/generation.py (UPDATED)
 
 import logging
+import asyncio
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
-from typing import Literal
-
+from typing import Literal, Optional
+import tempfile
+from pathlib import Path
+from fastapi import UploadFile, File, Form
 from ... import crud, schemas
 from ...database import get_db
 from ...config import settings
@@ -16,6 +20,10 @@ router = APIRouter(
     prefix="/api/generation",
     tags=["Generation API"],
 )
+# Add this new response schema
+class GeneratedContentResponse(BaseModel):
+    prompt: Optional[str] = None
+    tags: Optional[str] = None
 
 # Define a schema for the incoming request body
 class GenerationRequest(BaseModel):
@@ -96,3 +104,72 @@ async def generate_caption_for_image(
     updated_image = await crud.update_image(db, db_image=db_image, image_update=update_schema)
 
     return updated_image
+
+@router.post("/generate-for-upload", response_model=GeneratedContentResponse)
+async def generate_content_for_upload(
+    request: Request,
+    file: UploadFile = File(...),
+    generate_description: bool = Form(False),
+    generate_tags: bool = Form(False)
+):
+    """
+    Receives a temporary image file, runs the requested AI services,
+    and returns the generated text without saving anything.
+    """
+    caption_service = request.app.state.caption_service
+    if not caption_service:
+        raise HTTPException(status_code=503, detail="Captioning service is not available.")
+
+    # We will manually create and delete the temp file to control its lifecycle.
+    temp_path: Optional[Path] = None
+    try:
+        # 1. Create a unique path in the system's temp directory.
+        temp_dir = Path(tempfile.gettempdir())
+        temp_filename = f"{uuid.uuid4()}{Path(file.filename).suffix}"
+        temp_path = temp_dir / temp_filename
+        
+        # 2. Write the file content and ensure it's closed immediately.
+        with open(temp_path, "wb") as buffer:
+            buffer.write(await file.read())
+        
+        # 3. Now that the file is closed, we can safely pass its path to other services.
+        tasks_to_run = []
+        if generate_description:
+            tasks_to_run.append(caption_service.generate_gemini_description(temp_path))
+        if generate_tags:
+            tasks_to_run.append(caption_service.generate_wd14_tags(temp_path))
+
+        if not tasks_to_run:
+            return GeneratedContentResponse()
+
+        results = await asyncio.gather(*tasks_to_run, return_exceptions=True)
+        
+        response_data = {}
+        result_index = 0
+        if generate_description:
+            desc_result = results[result_index]
+            if isinstance(desc_result, str):
+                response_data["prompt"] = desc_result
+            else:
+                logger.error(f"Upload-gen Gemini failed: {desc_result}")
+            result_index += 1
+        
+        if generate_tags:
+            tags_result = results[result_index]
+            if isinstance(tags_result, str):
+                response_data["tags"] = tags_result
+            else:
+                logger.error(f"Upload-gen WD14 failed: {tags_result}")
+
+        return GeneratedContentResponse(**response_data)
+
+    except Exception as e:
+        logger.error(f"Error during upload generation: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to generate content from image.")
+    finally:
+        # 4. CRITICAL: Ensure the temporary file is deleted after we're done.
+        if temp_path and temp_path.exists():
+            try:
+                temp_path.unlink()
+            except OSError as e:
+                logger.error(f"Failed to delete temporary file {temp_path}: {e}")
