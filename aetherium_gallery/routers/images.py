@@ -76,6 +76,7 @@ async def handle_staged_upload(
 
         # Process Video or Image from the definitive saved_path
         if content_type.startswith("video/"):
+            # This part is likely working correctly, so we leave it as is.
             video_meta, thumbnail_filename = utils.process_video_file(saved_path, filename_stem)
             video_source_obj = await crud.create_video_source(db, video_data={
                 "filename": safe_filename, "filepath": safe_filename, "content_type": content_type,
@@ -87,7 +88,16 @@ async def handle_staged_upload(
                 "video_source_id": video_source_obj.id, "size_bytes": None
             }
         else: # Handle Image
-            thumbnail_filename = utils.generate_thumbnail(saved_path, filename_stem)
+            # ▼▼▼ THIS BLOCK IS THE FIX ▼▼▼
+
+            # 1. Call the utility to create the thumbnail file on disk. We ignore its return value.
+            utils.generate_thumbnail(saved_path, filename_stem)
+
+            # 2. Explicitly construct the relative path that MUST be saved to the database.
+            #    This ensures the path is correct regardless of what the utility returns.
+            thumbnail_filename = f"thumbnails/{filename_stem}_thumb.webp"
+            
+            # This part of the logic remains the same
             image_meta = utils.parse_metadata_from_image(saved_path)
             form_data = {**image_meta, **{k:v for k,v in form_data.items() if v is not None and v != ''}}
             image_record_data = {
@@ -96,7 +106,7 @@ async def handle_staged_upload(
                 "size_bytes": len(content)
             }
         
-        # Create final DB record
+        # Create final DB record (This part now receives the correct thumbnail_path)
         final_image_data = {
             "filename": safe_filename, "original_filename": original_filename,
             "filepath": safe_filename, "thumbnail_path": thumbnail_filename,

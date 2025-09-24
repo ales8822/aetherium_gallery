@@ -8,11 +8,16 @@
 
 <div class="similar-source-container">
     <div class="similar-source-image">
-        <img src="{{ url_for('uploads', path=source_image.thumbnail_path) }}" alt="Source Image">
+        <!-- ▼▼▼ ADD THIS IF CHECK ▼▼▼ -->
+        {% if source_image.thumbnail_path %}
+            <img src="{{ url_for('uploads', path=source_image.thumbnail_path) }}" alt="Source Image">
+        {% else %}
+            <div class="placeholder-image">No Thumbnail</div>
+        {% endif %}
     </div>
     <div class="similar-source-text">
         <p>Showing results similar to:</p>
-        <h3>{{ source_image.original_filename }}</h3>
+        <h3>{{ source_image.original_filename or "Untitled Image" }}</h3>
     </div>
 </div>
 

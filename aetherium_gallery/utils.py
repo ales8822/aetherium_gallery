@@ -58,16 +58,33 @@ def save_uploaded_image(file, filename: str) -> Path:
 # ▼▼▼ REPLACE THIS FUNCTION ▼▼▼
 def generate_thumbnail(image_path: Path, filename_stem: str) -> Optional[str]:
     """Generates a thumbnail for a given image file."""
-    thumbnail_filename = f"{filename_stem}_thumb.jpg"
-    thumbnail_filepath = settings.UPLOAD_PATH / thumbnail_filename
     try:
+        # 1. Define the output filename with the correct extension
+        thumbnail_filename = f"{filename_stem}_thumb.webp"
+        
+        # 2. Ensure the 'thumbnails' subdirectory exists
+        thumbnail_dir = settings.UPLOAD_PATH / "thumbnails"
+        thumbnail_dir.mkdir(exist_ok=True)
+        
+        # 3. Define the full, correct path to save the file
+        thumbnail_filepath = thumbnail_dir / thumbnail_filename
+
         with PILImage.open(image_path) as img:
-            if img.mode not in ('RGB', 'RGBA', 'L'):
+            # Convert to RGB if necessary (e.g., from GIF, P)
+            if img.mode not in ('RGB', 'RGBA'):
                  img = img.convert('RGB')
+            
+            # Create the thumbnail in place
             img.thumbnail(THUMBNAIL_SIZE)
-            img.save(thumbnail_filepath, "JPEG", quality=90, optimize=True) # Added quality settings
+            
+            # 4. Save the file in WEBP format with high quality
+            img.save(thumbnail_filepath, "WEBP", quality=90)
+            
             logger.info(f"Generated image thumbnail: {thumbnail_filepath}")
-            return thumbnail_filename
+
+            # 5. Return the full relative path, which matches what images.py expects
+            return f"thumbnails/{thumbnail_filename}"
+
     except Exception as e:
         logger.error(f"Error generating image thumbnail for {image_path}: {e}", exc_info=True)
         return None

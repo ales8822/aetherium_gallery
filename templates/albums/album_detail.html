@@ -141,27 +141,25 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // ▼▼▼ THIS FUNCTION IS NOW FIXED ▼▼▼
     function renderSuggestions(images) {
-        suggestionsGrid.innerHTML = images.map(image => {
-            // FIX: Use image.thumbnail_path directly from the API response.
-            // This is the correct and robust way to get the thumbnail URL.
-            const thumbnailUrl = image.thumbnail_path; 
+            suggestionsGrid.innerHTML = images.map(image => {
+                // THE FIX IS HERE: We manually prepend '/uploads/' to create the correct absolute URL path.
+                const thumbnailUrl = `/uploads/${image.thumbnail_path}`; 
 
-            const videoIndicator = image.is_video ? '<span class="video-indicator">▶</span>' : '';
-            const nsfwClass = image.is_nsfw ? 'is-nsfw' : '';
+                const videoIndicator = image.is_video ? '<span class="video-indicator">▶</span>' : '';
+                const nsfwClass = image.is_nsfw ? 'is-nsfw' : '';
 
-            return `
-                <div class="gallery-item ${nsfwClass}" data-id="${image.id}" data-type="${image.is_video ? 'video' : 'image'}">
-                    <a href="/image/${image.id}">
-                        <img src="${thumbnailUrl}" alt="${image.prompt || 'Gallery image'}" loading="lazy">
-                        ${videoIndicator}
-                        <div class="select-checkbox"></div>
-                    </a>
-                </div>
-            `;
-        }).join('');
-    }
+                return `
+                    <div class="gallery-item ${nsfwClass}" data-id="${image.id}" data-type="${image.is_video ? 'video' : 'image'}">
+                        <a href="/image/${image.id}">
+                            <img src="${thumbnailUrl}" alt="${image.prompt || 'Gallery image'}" loading="lazy">
+                            ${videoIndicator}
+                            <div class="select-checkbox"></div>
+                        </a>
+                    </div>
+                `;
+            }).join('');
+        }
 });
 </script>
 {% endblock %}

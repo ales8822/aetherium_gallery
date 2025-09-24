@@ -373,44 +373,44 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    function saveChanges() {
+     function saveChanges() {
         const formData = new FormData(editForm);
         const updateData = {};
 
+        // Define which keys should be treated as integers or floats
+        const integerFields = ['seed', 'steps'];
+        const floatFields = ['cfg_scale'];
+
         for (const [key, value] of formData.entries()) {
-            const inputElement = editForm.elements[key];
             const trimmedValue = value.trim();
 
-            // --- Handle specific fields first ---
-            if (key === 'album_id') {
-                // If the value is an empty string, set it to null. Otherwise, parse as int.
+            if (integerFields.includes(key)) {
+                // If it's an integer field and not empty, parse it. Otherwise, set to null.
+                updateData[key] = trimmedValue !== '' ? parseInt(trimmedValue, 10) : null;
+            } else if (floatFields.includes(key)) {
+                // If it's a float field and not empty, parse it. Otherwise, set to null.
+                updateData[key] = trimmedValue !== '' ? parseFloat(trimmedValue) : null;
+            } else if (key === 'album_id') {
+                // Handle album_id separately as before
                 updateData[key] = trimmedValue === '' ? null : parseInt(trimmedValue, 10);
-            } 
-            else if (inputElement.type === 'number' && trimmedValue !== '') {
-                updateData[key] = parseFloat(trimmedValue);
-            }
-            else if (key === 'seed' && trimmedValue !== '') {
-                // Also handle seed, which is text but should be an integer
-                updateData[key] = parseInt(trimmedValue, 10);
-            }
-            else {
-                // For regular text fields, use the value directly
-                updateData[key] = value; // Use original value to preserve whitespace in prompts etc.
+            } else {
+                // All other fields are treated as strings
+                updateData[key] = value;
             }
         }
 
         // Handle the boolean checkbox separately
         updateData['is_nsfw'] = editForm.elements['is_nsfw'].checked;
         
-        // Remove empty numeric fields that might have parsed to NaN
+        // Final check for NaN values from failed parsing (e.g., user enters "abc" in a number field)
         for (const key in updateData) {
             if (typeof updateData[key] === 'number' && isNaN(updateData[key])) {
-                updateData[key] = null;
+                updateData[key] = null; // Convert any invalid numbers to null
             }
         }
         
         statusMessage.textContent = 'Saving...';
-        statusMessage.style.color = '#e0e0e0';
+        statusMessage.style.color = '#e0e0eota';
 
         fetch(`/api/images/${imageId}`, {
             method: 'PATCH',
@@ -420,9 +420,10 @@ document.addEventListener('DOMContentLoaded', function () {
         .then(response => {
             if (!response.ok) {
                 return response.json().then(err => { 
+                    // Create a readable error string from the validation response
                     let errorMsg = err.detail || 'Unknown error';
                     if (Array.isArray(err.detail)) {
-                       errorMsg = err.detail.map(e => `${e.loc.join('.')}: ${e.msg}`).join('; ');
+                       errorMsg = err.detail.map(e => e.msg).join('; ');
                     }
                     throw new Error(errorMsg); 
                 });
