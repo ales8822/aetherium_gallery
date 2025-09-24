@@ -1,93 +1,23 @@
-<!-- templates/upload.html (Final Version) -->
+<!-- In templates/upload.html, REPLACE the entire file with this new structure -->
+
 {% extends "base.html" %}
 
-{% block title %}Upload Image{% endblock %}
+{% block title %}Bulk Upload{% endblock %}
 
 {% block content %}
-<h1>Upload New Image</h1>
+<h1>Bulk Upload</h1>
+<p>Select multiple images or videos. Metadata and options below will be applied to all uploaded files.</p>
 
-<!-- Form now points to our new "staged" endpoint -->
-<form action="{{ url_for('handle_staged_upload') }}" method="post" enctype="multipart/form-data" id="upload-form">
-
-    <div class="upload-grid">
-        <!-- Column 1: File Input & Preview -->
-        <div class="upload-col-preview">
-            <!-- IMPORTANT: The 'name' must match your FastAPI endpoint parameter -->
-            <input type="file" id="image-upload" name="file" accept="image/png, image/jpeg, image/webp, video/mp4, video/webm" required class="file-input">
-            
-            <!-- templates/upload.html (NEW PREVIEW CONTAINER) -->
-            <div id="preview-container" class="preview-container">
-                <div id="preview-text" class="preview-text">Select an image or video to see a preview</div>
-                <div id="loading-spinner" class="loading-spinner" style="display: none;">
-                    <div class="spinner"></div>
-                    <!-- Wrap the text in a div with an ID for easy selection -->
-                    <div id="loading-spinner-text">Extracting Metadata...</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Column 2: Editable Metadata Fields -->
-        <div class="upload-col-metadata">
-            <h2>Image Details (Edit as needed)</h2>
+<div class="upload-grid-bulk">
+    <!-- Column 1: Batch Metadata & Actions -->
+    <div class="upload-col-metadata">
+        <h2>Batch Options</h2>
+        <!-- We use a 'form' tag here just to group the inputs, not for submission -->
+        <form id="batch-metadata-form">
             <div class="form-group">
-                <label for="original_filename">Original Filename</label>
-                <!-- This field is for display; the original name is handled automatically -->
-                <input type="text" id="original_filename" name="original_filename" readonly>
-            </div>
-            
-            <div class="form-group">
-                <label for="prompt">Prompt</label>
-                <textarea id="prompt" name="prompt" rows="5"></textarea>
-            </div>
-            
-            <div class.form-group">
-                <label for="negative_prompt">Negative Prompt</label>
-                <textarea id="negative_prompt" name="negative_prompt" rows="3"></textarea>
-            </div>
-
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="steps">Steps</label>
-                    <input type="number" id="steps" name="steps">
-                </div>
-                <div class="form-group">
-                    <label for="sampler">Sampler</label>
-                    <input type="text" id="sampler" name="sampler">
-                </div>
-            </div>
-
-             <div class="form-row">
-                <div class="form-group">
-                    <label for="cfg_scale">CFG Scale</label>
-                    <input type="number" step="0.1" id="cfg_scale" name="cfg_scale">
-                </div>
-                <div class="form-group">
-                    <label for="seed">Seed</label>
-                    <input type="text" id="seed" name="seed"> <!-- Text type handles large seeds better -->
-                </div>
-            </div>
-            <div class="form-group">
-                <label for="tags">Tags (comma-separated)</label>
+                <label for="tags">Add Tags (comma-separated)</label>
                 <input type="text" id="tags" name="tags" placeholder="e.g. character, cyberpunk, futuristic">
             </div>
-            <!-- ▼▼▼ ADD THIS NEW 'AI GENERATION' SECTION ▼▼▼ -->
-            <div id="ai-generation-group" class="form-group form-group-generation" style="display: none;">
-                <label class="generation-label">AI Generation Options</label>
-                <button type="button" id="ai-generate-button" class="button-secondary">✨ Generate</button>
-                <div class="form-group-checkbox">
-                    <input type="checkbox" id="generate-all" name="generate_all">
-                    <label for="generate-all"><strong>Generate Both</strong></label>
-                </div>
-                <div class="form-group-checkbox sub-option">
-                    <input type="checkbox" id="generate-description" name="generate_description" value="on">
-                    <label for="generate-description">Generate Description (Gemini)</label>
-                </div>
-                <div class="form-group-checkbox sub-option">
-                    <input type="checkbox" id="generate-tags" name="generate_tags" value="on">
-                    <label for="generate-tags">Generate Tags (WD14)</label>
-                </div>
-            </div>
-
             <div class="form-group">
                 <label for="album_id">Add to Album (Optional)</label>
                 <select name="album_id" id="album_id">
@@ -101,258 +31,213 @@
             </div>
             <div class="form-group form-group-checkbox">
                 <input type="checkbox" id="is_nsfw" name="is_nsfw" value="on">
-                <label for="is_nsfw">This image is NSFW (18+)</label>
+                <label for="is_nsfw">Mark all images as NSFW (18+)</label>
+            </div>
+            <div class="form-actions">
+                <button type="button" id="start-upload-button" class="button-primary">Start Upload</button>
+            </div>
+        </form>
+         <div id="global-progress-container" class="progress-container" style="display: none;">
+            <p id="global-progress-text">Uploading 1 of 5...</p>
+            <div class="progress-bar-outer">
+                <div id="global-progress-bar" class="progress-bar-inner"></div>
             </div>
         </div>
     </div>
-
-    <div class="form-actions">
-        <button type="submit" id="submit-button" disabled>Upload Image</button>
+    
+    <!-- Column 2: File Queue -->
+    <div class="upload-col-queue">
+        <!-- The file input triggers the queue display -->
+        <div class="file-input-wrapper">
+            <label for="file-input-bulk" class="button">Select Files</label>
+            <input type="file" id="file-input-bulk" name="files" accept="image/png, image/jpeg, image/webp, video/mp4, video/webm" multiple>
+        </div>
+        
+        <div id="upload-queue-container">
+            <!-- JavaScript will populate this area with selected files -->
+            <p id="queue-placeholder">No files selected.</p>
+        </div>
     </div>
+</div>
+{% endblock %}
 
-</form>
+{% block head_extra %}
+<!-- Add the specific styles for the bulk upload page -->
+<style>
+    .upload-grid-bulk { display: grid; grid-template-columns: 350px 1fr; gap: 2.5rem; align-items: flex-start; }
+    .upload-col-queue { min-height: 400px; }
+    .file-input-wrapper { text-align: center; margin-bottom: 1.5rem; }
+    #file-input-bulk { display: none; } /* Hide the actual input */
+    .file-input-wrapper label { display: inline-block; cursor: pointer; }
+    
+    #upload-queue-container {
+        display: flex; flex-direction: column; gap: 1rem;
+        border: 2px dashed #444; border-radius: 8px;
+        padding: 1rem; min-height: 300px;
+    }
+    .queue-item {
+        display: flex; align-items: center; gap: 1rem;
+        background-color: #333; padding: 0.5rem; border-radius: 4px;
+        border-left: 4px solid #555; /* Status indicator */
+    }
+    .queue-item.status-uploading { border-left-color: #64b5f6; }
+    .queue-item.status-success { border-left-color: #81c784; }
+    .queue-item.status-error { border-left-color: #e57373; }
 
+    .queue-preview { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; flex-shrink: 0; background-color: #252525;}
+    .queue-info { flex-grow: 1; }
+    .queue-info .filename { font-weight: bold; margin: 0; font-size: 0.9em; word-break: break-all; }
+    .queue-info .status-text { margin: 0; font-size: 0.8em; color: #aaa; }
+    .queue-remove-btn { background: none; border: none; color: #888; cursor: pointer; font-size: 1.5em; padding: 0 .5rem; }
+    .queue-remove-btn:hover { color: #e57373; }
+    
+    .progress-container { margin-top: 1rem; }
+    .progress-bar-outer { width: 100%; background-color: #2a2a2a; border-radius: 4px; padding: 3px; border: 1px solid #444; }
+    .progress-bar-inner { height: 12px; background-color: #64b5f6; border-radius: 2px; width: 0%; transition: width 0.2s ease-out; }
 
+    @media (max-width: 900px) { .upload-grid-bulk { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block scripts_extra %}
+<!-- This script is entirely new for this page -->
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-    // --- Get all DOM Elements ---
-    const uploadInput = document.getElementById("image-upload");
-    const previewContainer = document.getElementById("preview-container");
-    const previewText = document.getElementById("preview-text");
-    const loadingSpinner = document.getElementById("loading-spinner");
-    const loadingSpinnerText = document.getElementById("loading-spinner-text"); // <-- Get the new element
-    const submitButton = document.getElementById("submit-button");
-    const form = document.getElementById("upload-form");
-    const aiGenerationGroup = document.getElementById("ai-generation-group");
-    const aiGenerateButton = document.getElementById("ai-generate-button");
-    const genAllCheckbox = document.getElementById("generate-all");
-    const genDescCheckbox = document.getElementById("generate-description");
-    const genTagsCheckbox = document.getElementById("generate-tags");
+    // --- DOM Elements ---
+    const fileInput = document.getElementById("file-input-bulk");
+    const queueContainer = document.getElementById("upload-queue-container");
+    const placeholder = document.getElementById("queue-placeholder");
+    const metadataForm = document.getElementById("batch-metadata-form");
+    const startUploadButton = document.getElementById("start-upload-button");
+
+    const progressContainer = document.getElementById("global-progress-container");
+    const progressText = document.getElementById("global-progress-text");
+    const progressBar = document.getElementById("global-progress-bar");
+
+    // --- State ---
+    let filesToUpload = []; // Use an array to manage File objects
 
     // --- Event Listeners ---
-    uploadInput.addEventListener("change", handleFileSelection);
-    aiGenerateButton.addEventListener("click", handleAIGeneration);
-    
-    // Checkbox logic (unchanged)
-    genAllCheckbox.addEventListener('change', () => {
-        genDescCheckbox.checked = genAllCheckbox.checked;
-        genTagsCheckbox.checked = genAllCheckbox.checked;
-    });
-    [genDescCheckbox, genTagsCheckbox].forEach(cb => {
-        cb.addEventListener('change', () => {
-            genAllCheckbox.checked = genDescCheckbox.checked && genTagsCheckbox.checked;
-        });
-    });
+    fileInput.addEventListener("change", handleFileSelection);
+    queueContainer.addEventListener("click", handleQueueClick);
+    startUploadButton.addEventListener("click", processUploadQueue);
 
-    // --- Main Functions ---
+    // --- Functions ---
     function handleFileSelection(event) {
-        const file = event.target.files[0];
-        if (!file) { submitButton.disabled = true; return; }
+        const selectedFiles = Array.from(event.target.files);
+        selectedFiles.forEach(file => {
+            const fileId = `file-${Math.random().toString(36).substr(2, 9)}`;
+            filesToUpload.push({ id: fileId, file: file });
+            addFileToQueueUI(fileId, file);
+        });
+        if (filesToUpload.length > 0) placeholder.style.display = "none";
         
-        updatePreview(file);
-        form.elements['original_filename'].value = file.name;
-
-        if (file.type.startsWith('image/')) {
-            aiGenerationGroup.style.display = 'block';
-            fetchAndFillMetadata(file);
-        } else {
-            aiGenerationGroup.style.display = 'none';
-            submitButton.disabled = false;
-        }
+        // Clear the input value to allow re-selecting the same files
+        fileInput.value = "";
     }
 
-    async function handleAIGeneration() {
-        const file = uploadInput.files[0];
-        const doDesc = genDescCheckbox.checked;
-        const doTags = genTagsCheckbox.checked;
+    function addFileToQueueUI(fileId, file) {
+        const objectURL = URL.createObjectURL(file);
+        const mediaTag = file.type.startsWith('image/')
+            ? `<img src="${objectURL}" class="queue-preview" alt="Preview">`
+            : `<video src="${objectURL}" class="queue-preview" muted playsinline></video>`;
 
-        if (!file || (!doDesc && !doTags)) {
-            alert("Please select a file and choose at least one generation option.");
+        const itemHTML = `
+            <div class="queue-item" id="${fileId}" data-status="pending">
+                ${mediaTag}
+                <div class="queue-info">
+                    <p class="filename">${file.name}</p>
+                    <p class="status-text">Pending</p>
+                </div>
+                <button type="button" class="queue-remove-btn" title="Remove from queue">&times;</button>
+            </div>`;
+        queueContainer.insertAdjacentHTML('beforeend', itemHTML);
+    }
+
+    function handleQueueClick(event) {
+        const removeButton = event.target.closest('.queue-remove-btn');
+        if (!removeButton) return;
+        
+        const queueItem = removeButton.closest('.queue-item');
+        const fileIdToRemove = queueItem.id;
+        
+        // Remove from UI
+        queueItem.remove();
+        
+        // Remove from internal state array
+        filesToUpload = filesToUpload.filter(f => f.id !== fileIdToRemove);
+        
+        if (filesToUpload.length === 0) placeholder.style.display = "block";
+    }
+
+    async function processUploadQueue() {
+        if (filesToUpload.length === 0) {
+            alert("Please select files to upload.");
             return;
         }
-        
-        // ▼▼▼ THIS IS THE FIX ▼▼▼
-        // Use the new ID to safely change the text
-        loadingSpinnerText.textContent = 'Generating with AI...';
-        loadingSpinner.style.display = 'flex';
-        aiGenerateButton.disabled = true;
-        submitButton.disabled = true;
-        
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("generate_description", doDesc);
-        formData.append("generate_tags", doTags);
 
-        try {
-            const response = await fetch("/api/generation/generate-for-upload", {
-                method: "POST",
-                body: formData,
-            });
-            if (!response.ok) {
-                const err = await response.json();
-                throw new Error(err.detail || "Unknown error during AI generation.");
-            }
-            const data = await response.json();
+        startUploadButton.disabled = true;
+        startUploadButton.textContent = "Uploading...";
+        progressContainer.style.display = "block";
 
-            if (data.prompt) {
-                form.elements['prompt'].value = data.prompt;
-            }
-            if (data.tags) {
-                const existingTags = new Set((form.elements['tags'].value || '').split(',').map(t => t.trim()).filter(Boolean));
-                const newTags = new Set(data.tags.split(',').map(t => t.trim()).filter(Boolean));
-                const combinedTags = Array.from(new Set([...existingTags, ...newTags])).sort().join(', ');
-                form.elements['tags'].value = combinedTags;
-            }
+        const totalFiles = filesToUpload.length;
+        for (let i = 0; i < totalFiles; i++) {
+            const fileData = filesToUpload[i];
+            const queueItemElement = document.getElementById(fileData.id);
+            const statusTextElement = queueItemElement.querySelector('.status-text');
             
-        } catch (error) {
-            console.error("AI Generation failed:", error);
-            alert(`AI Generation failed: ${error.message}`);
-        } finally {
-            loadingSpinner.style.display = 'none';
-            aiGenerateButton.disabled = false;
-            submitButton.disabled = false;
+            progressText.textContent = `Uploading ${i + 1} of ${totalFiles}: ${fileData.file.name}`;
+            progressBar.style.width = `${((i + 1) / totalFiles) * 100}%`;
+            
+            updateQueueItemStatus(queueItemElement, statusTextElement, "uploading", "Uploading...");
+
+            try {
+                // Prepare FormData for this specific file
+                const formData = new FormData();
+                formData.append('file', fileData.file);
+                formData.append('original_filename', fileData.file.name);
+                
+                // Append batch metadata
+                const batchData = new FormData(metadataForm);
+                for (const [key, value] of batchData.entries()) {
+                    formData.append(key, value);
+                }
+
+                // Call the single-file API endpoint
+                const response = await fetch("{{ url_for('handle_single_upload_api') }}", {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || "Upload failed");
+                }
+
+                const result = await response.json();
+                const detailUrl = `/image/${result.id}`;
+                updateQueueItemStatus(queueItemElement, statusTextElement, "success", `Success! <a href="${detailUrl}" target="_blank">View Image</a>`);
+                // Disable the remove button on success
+                queueItemElement.querySelector('.queue-remove-btn').disabled = true;
+
+            } catch (error) {
+                console.error(`Failed to upload ${fileData.file.name}:`, error);
+                updateQueueItemStatus(queueItemElement, statusTextElement, "error", `Error: ${error.message}`);
+            }
         }
+        
+        progressText.textContent = "Upload complete!";
+        startUploadButton.textContent = "Upload More";
+        startUploadButton.disabled = false;
+        filesToUpload = []; // Clear the queue after processing
     }
 
-    // --- Helper Functions ---
-    function updatePreview(file) {
-        const objectURL = URL.createObjectURL(file);
-        const existingPreview = previewContainer.querySelector('.media-preview');
-        if (existingPreview) existingPreview.remove();
-        previewText.style.display = 'none';
-
-        let mediaElement = document.createElement(file.type.startsWith('image/') ? 'img' : 'video');
-        mediaElement.src = objectURL;
-        if (mediaElement.tagName === 'VIDEO') {
-            Object.assign(mediaElement, { autoplay: true, muted: true, loop: true, playsInline: true });
-        }
-        mediaElement.className = 'media-preview';
-        previewContainer.insertBefore(mediaElement, loadingSpinner);
-    }
-    
-    function fetchAndFillMetadata(file) {
-        // Also update the text here for consistency
-        loadingSpinnerText.textContent = 'Extracting Metadata...';
-        loadingSpinner.style.display = 'flex';
-        submitButton.disabled = true;
-        const formData = new FormData();
-        formData.append("file", file);
-
-        fetch("/api/images/extract-metadata", { method: "POST", body: formData })
-            .then(response => {
-                if (!response.ok) return response.json().then(err => { throw new Error(err.detail); });
-                return response.json();
-            })
-            .then(data => {
-                form.elements['prompt'].value = data.prompt || '';
-                form.elements['negative_prompt'].value = data.negative_prompt || '';
-                form.elements['steps'].value = data.steps || '';
-                form.elements['sampler'].value = data.sampler || '';
-                form.elements['cfg_scale'].value = data.cfg_scale || '';
-                form.elements['seed'].value = data.seed || '';
-            })
-            .catch(error => {
-                console.error("Metadata extraction failed:", error);
-                alert(`Could not get metadata: ${error.message}. You can still upload manually.`);
-            })
-            .finally(() => {
-                loadingSpinner.style.display = 'none';
-                submitButton.disabled = false;
-            });
+    function updateQueueItemStatus(itemElement, textElement, status, message) {
+        itemElement.dataset.status = status; // for styling
+        textElement.innerHTML = message; // use innerHTML to allow for links
+        itemElement.className = 'queue-item'; // Reset classes
+        itemElement.classList.add(`status-${status}`);
     }
 });
 </script>
-
-
-<!-- New CSS (or add to your main style.css) -->
-<style>
-    .upload-grid { display: grid; grid-template-columns: 300px 1fr; gap: 2.5rem; align-items: flex-start; }
-    .file-input { margin-bottom: 1rem; }
-    .preview-container {
-        width: 100%; height: 300px;
-        border: 2px dashed #444; border-radius: 8px;
-        display: flex; justify-content: center; align-items: center;
-        position: relative; overflow: hidden; background-color: #252525;
-    }
-    /* .image-preview { display: none; width: 100%; height: 100%; object-fit: contain; } */
-    .preview-text { color: #888; }
-    .loading-spinner {
-        position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(0,0,0,0.7); color: white;
-        display: flex; justify-content: center; align-items: center;
-        flex-direction: column; gap: 1rem; font-weight: bold;
-    }
-    .spinner {
-        border: 4px solid rgba(255, 255, 255, 0.3);
-        border-radius: 50%;
-        border-top: 4px solid #64b5f6;
-        width: 40px; height: 40px;
-        animation: spin 1s linear infinite;
-    }
-
-    .form-group-checkbox {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        background-color: #3f3f3f;
-        padding: 0.8rem;
-        border-radius: 4px;
-        margin-top: 1rem;
-    }
-    .form-group-checkbox label {
-        margin-bottom: 0;
-        font-weight: normal;
-        color: #e0e0e0;
-        cursor: pointer;
-    }
-    .form-group-checkbox input[type="checkbox"] {
-        width: auto;
-        transform: scale(1.2);
-    }
-    form select {
-    width: 100%;
-    padding: 0.8rem;
-    margin-bottom: 1rem;
-    border: 1px solid #555;
-    background-color: #333;
-    color: #e0e0e0;
-    border-radius: 4px;
-    box-sizing: border-box;
-    }
-
-    .form-group-generation {
-        background-color: #3f3f3f;
-        padding: 1rem;
-        border-radius: 4px;
-        margin-top: 1.5rem;
-    }
-    .form-group-generation .generation-label {
-        font-weight: bold;
-        color: #e0e0e0;
-        margin-bottom: 0.25rem;
-    }
-     .form-group-generation .generation-note {
-        font-size: 0.8em;
-        color: #aaa;
-        margin-top: 0;
-        margin-bottom: 1rem;
-    }
-    .form-group-generation .sub-option {
-        margin-left: 1rem; /* Indent sub-options */
-        background-color: transparent;
-        padding: 0.4rem 0;
-    }
-
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    .form-row { display: flex; gap: 1rem; }
-    .form-group { flex-grow: 1; margin-bottom: 1rem; }
-    .form-group label { display: block; margin-bottom: 0.5rem; color: #ccc; font-weight: bold; font-size: 0.9em;}
-    form input, form textarea { width: 100%; box-sizing: border-box; resize: vertical;}
-    form input[readonly] { background-color: #3f3f3f; cursor: not-allowed; border-color: #555;}
-    .form-actions { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #444; text-align: right; }
-    #submit-button:disabled { background-color: #555; color: #999; cursor: not-allowed; }
-
-    @media (max-width: 768px) { .upload-grid { grid-template-columns: 1fr; } }
-</style>
-
 {% endblock %}

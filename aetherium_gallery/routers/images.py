@@ -1,7 +1,7 @@
 import shutil
 import os
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, Form, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 import logging
@@ -29,8 +29,8 @@ logger = logging.getLogger(__name__)
 
 # --- User-Facing Upload Endpoint (part of the web UI flow) ---
 
-@upload_router.post("/upload-staged", response_class=RedirectResponse, name="handle_staged_upload")
-async def handle_staged_upload(
+@upload_router.post("/upload/single", response_model=schemas.Image, name="handle_single_upload_api")
+async def handle_single_upload_api(
     request: Request,
     db: AsyncSession = Depends(get_db),
     file: UploadFile = File(...),
@@ -136,7 +136,7 @@ async def handle_staged_upload(
     finally:
         await file.close()
 
-    return RedirectResponse(url=request.url_for('gallery_index'), status_code=303)
+    return new_image_record
 
 @router.post("/extract-metadata", summary="Extract metadata from an uploaded image")
 async def extract_metadata_from_image(file: UploadFile = File(...)):
