@@ -2,11 +2,7 @@
 {% extends "base.html" %} {% block title %}{{ page_title }}{% endblock %} {%
 block content %}
 
-<!-- Link to the Lightbox CSS (add this or ensure it's in your base.html head) -->
-<link
-  rel="stylesheet"
-  href="https://cdn.jsdelivr.net/npm/basiclightbox@5.0.4/dist/basicLightbox.min.css"
-/>
+
 
 <h1>Gallery</h1>
 
@@ -19,8 +15,7 @@ block content %}
 {% endif %}
 
 {% include 'partials/bulk_actions_panel.html' %}
-<!-- JavaScript for the Lightbox -->
-<script src="https://cdn.jsdelivr.net/npm/basiclightbox@5.0.4/dist/basicLightbox.min.js"></script>
+
 
 <script>
  

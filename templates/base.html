@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}Aetherium Gallery{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}" />
-    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basiclightbox@5.0.4/dist/basicLightbox.min.css" />
     <!-- Styles for the toggle switch (Unchanged) -->
     <style>
       .safe-mode-toggle { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; user-select: none;}
@@ -165,7 +165,7 @@
     </script>
     
    <!-- templates/base.html (Final, Complete Script) -->
-
+ <script src="https://cdn.jsdelivr.net/npm/basiclightbox@5.0.4/dist/basicLightbox.min.js"></script>
 {% block scripts_extra %}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
