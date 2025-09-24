@@ -24,6 +24,18 @@
     flex-shrink:0;
     transition:all .2s ease
 }
+.metadata-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem; /* Give some space below the header */
+}
+.metadata-header h2 {
+    margin: 0; /* Remove default margin from h2 */
+}
+.metadata-header .generate-inline-button {
+    margin-left: 1rem; /* Space between title and button */
+}
 .copy-button:hover, .generate-inline-button:hover { color:#64b5f6 }
 .copy-button:disabled, .generate-inline-button:disabled { color:#555; cursor: not-allowed; }
 .copy-button svg, .generate-inline-button svg { fill:currentColor; width:18px; height:18px }
@@ -52,6 +64,12 @@
 
     <div id="metadata-editor-panel" class="metadata-panel metadata-editor" data-image-id="{{ image.id }}">
         <h2>Metadata</h2>
+        {% if not image.video_source %}
+            <button type="button" class="generate-inline-button" data-source="all" title="Generate Description & Tags">
+                <!-- A "magic wand" icon is perfect for "generate all" -->
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h24v24H0z" fill="none"/><path d="M19 8l-4 4h3c0 3.31-2.69 6-6 6-1.01 0-1.97-.25-2.8-.7l-1.46 1.46C8.97 19.54 10.43 20 12 20c4.42 0 8-3.58 8-8h3l-4-4zM6 12c0-3.31 2.69-6 6-6 1.01 0 1.97.25 2.8.7l1.46-1.46C15.03 4.46 13.57 4 12 4c-4.42 0-8 3.58-8 8H1l4 4 4-4H6z"/></svg>
+            </button>
+        {% endif %}
         <form id="edit-form">
             
             <dl>
