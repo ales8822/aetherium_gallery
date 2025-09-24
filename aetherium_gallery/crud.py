@@ -1,11 +1,10 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from sqlalchemy import or_, func # This is the ONLY import we need for SQL functions
-from sqlalchemy import case, update
+from sqlalchemy import or_, func, case, update # Add 'case' for ordering
+from typing import List, Optional
 
 from . import models, schemas
-from typing import List, Optional
 
 
 # --- Image CRUD ---
@@ -25,12 +24,12 @@ async def get_image(db: AsyncSession, image_id: int) -> Optional[models.Image]:
     return result.scalars().first()
 
 async def get_images(
-    db: AsyncSession, 
-    skip: int = 0, 
-    limit: int = 100, 
+    db: AsyncSession,
+    skip: int = 0,
+    limit: int = 100,
     safe_mode: bool = False,
     # Add new parameter with default 'all'
-    media_type: str = 'all' 
+    media_type: str = 'all'
 ) -> List[models.Image]:
     """
     Get a list of images with pagination and optional filters.
@@ -39,10 +38,10 @@ async def get_images(
         selectinload(models.Image.tags),
         selectinload(models.Image.video_source)
     )
-    
+
     if safe_mode:
         query = query.filter(models.Image.is_nsfw == False)
-        
+
     # ▼▼▼ ADD THIS NEW FILTER LOGIC ▼▼▼
     if media_type == 'video':
         # Filter for images that HAVE a video source linked
@@ -50,7 +49,7 @@ async def get_images(
     elif media_type == 'image':
         # Filter for images that DO NOT have a video source
         query = query.filter(models.Image.video_source_id.is_(None))
-    
+
     query = query.order_by(models.Image.upload_date.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     return result.scalars().all()
@@ -59,7 +58,7 @@ async def create_image(db: AsyncSession, image_data: dict) -> models.Image:
     """Create a new image, processing and linking any associated tags."""
     # Pop tags from the dict if they exist, so we can handle them separately
     tag_names_str = image_data.pop('tags', None)
-    
+
     # Create the Image object without the tags first
     db_image = models.Image(**image_data)
 
@@ -77,13 +76,13 @@ async def create_image(db: AsyncSession, image_data: dict) -> models.Image:
 async def update_image(db: AsyncSession, db_image: models.Image, image_update: schemas.ImageUpdate) -> models.Image:
     """Update an existing image record, including its tags."""
     update_data = image_update.model_dump(exclude_unset=True)
-    
+
     # Handle tags separately. This logic will REPLACE existing tags, which is
     # what's needed for both the editor and the caption generator.
     if 'tags' in update_data:
         tag_names_str = update_data.pop('tags')
         tag_names = [name.strip().lower() for name in tag_names_str.split(',') if name.strip()]
-        
+
         # If tag_names is not an empty list, process them. Otherwise, clear the tags.
         if tag_names:
             tags = await get_or_create_tags_by_name(db, tag_names)
@@ -93,7 +92,7 @@ async def update_image(db: AsyncSession, db_image: models.Image, image_update: s
 
     for key, value in update_data.items():
         setattr(db_image, key, value)
-    
+
     db.add(db_image)
     await db.commit()
     await db.refresh(db_image)
@@ -126,15 +125,13 @@ async def update_image_order_in_album(db: AsyncSession, album_id: int, ordered_i
                 .values(order_index=index)
             )
             await db.execute(stmt)
-        
+
         # After all individual update statements have been executed, commit the transaction.
         await db.commit()
     except Exception as e:
         await db.rollback() # On any error, undo all changes in this transaction.
-        # Optionally, you can add logging here to see the error in your terminal
-        # logger.error(f"Failed to reorder album {album_id}: {e}", exc_info=True)
         return False
-        
+
     return True
 
 async def get_related_images(db: AsyncSession, source_image: models.Image, limit: int = 10) -> List[models.Image]:
@@ -146,13 +143,7 @@ async def get_related_images(db: AsyncSession, source_image: models.Image, limit
         return []
 
     source_tag_ids = {tag.id for tag in source_image.tags}
-
-    # This is an advanced query. Let's break it down:
-    # 1. We start with the image_tags_association table.
-    # 2. We filter it to find rows where the tag_id is one of our source image's tags.
-    # 3. We group by the image_id in that table.
-    # 4. We count the number of matching tags for each image_id, creating a "match_count".
-    # 5. We order the results so the images with the highest match_count come first.
+    
     subquery = (
         select(
             models.image_tags_association.c.image_id,
@@ -163,19 +154,15 @@ async def get_related_images(db: AsyncSession, source_image: models.Image, limit
         .order_by(func.count(models.image_tags_association.c.tag_id).desc())
         .subquery()
     )
-
-    # Now, we join the Image table with our subquery result.
+    
     query = (
         select(models.Image)
         .join(subquery, models.Image.id == subquery.c.image_id)
-        # Crucially, we exclude the source image itself from the results!
         .filter(models.Image.id != source_image.id)
-        # Eagerly load the data we need for the gallery display
         .options(
             selectinload(models.Image.tags),
             selectinload(models.Image.video_source)
         )
-        # Order by the match_count from our subquery
         .order_by(subquery.c.match_count.desc())
         .limit(limit)
     )
@@ -185,11 +172,11 @@ async def get_related_images(db: AsyncSession, source_image: models.Image, limit
 
 
 async def search_images(
-    db: AsyncSession, 
-    query: str, 
-    safe_mode: bool = False, 
-    media_type: str = 'all', 
-    skip: int = 0, 
+    db: AsyncSession,
+    query: str,
+    safe_mode: bool = False,
+    media_type: str = 'all',
+    skip: int = 0,
     limit: int = 100
 ) -> List[models.Image]:
     """
@@ -201,7 +188,6 @@ async def search_images(
 
     search_term = f"%{query}%"
 
-    # Start building the database query correctly
     db_query = select(models.Image).filter(
         or_(
             models.Image.prompt.ilike(search_term),
@@ -210,22 +196,56 @@ async def search_images(
         )
     )
 
-    # Eagerly load relationships
     db_query = db_query.options(
-        selectinload(models.Image.tags), 
+        selectinload(models.Image.tags),
         selectinload(models.Image.video_source)
     )
 
     if safe_mode:
         db_query = db_query.filter(models.Image.is_nsfw == False)
-        
+
     if media_type == 'video':
         db_query = db_query.filter(models.Image.video_source_id.isnot(None))
     elif media_type == 'image':
         db_query = db_query.filter(models.Image.video_source_id.is_(None))
-        
+
     db_query = db_query.order_by(models.Image.upload_date.desc()).offset(skip).limit(limit)
     result = await db.execute(db_query)
+    return result.scalars().all()
+
+# ▼▼▼ NEW FUNCTION ▼▼▼
+async def get_image_ids_for_album(db: AsyncSession, album_id: int) -> List[int]:
+    """Fetches a simple list of image IDs belonging to a specific album."""
+    result = await db.execute(
+        select(models.Image.id)
+        .filter(models.Image.album_id == album_id)
+    )
+    return result.scalars().all()
+
+# ▼▼▼ REVISED FUNCTION ▼▼▼
+async def get_images_by_ids(db: AsyncSession, image_ids: List[int]) -> List[models.Image]:
+    """
+    Fetches a list of Image objects from a list of IDs, preserving the original order.
+    """
+    if not image_ids:
+        return []
+
+    # Create a CASE statement to order the results based on the input list's order.
+    # This is crucial to show the most similar images first.
+    order_logic = case(
+        {id: index for index, id in enumerate(image_ids)},
+        value=models.Image.id
+    )
+
+    result = await db.execute(
+        select(models.Image)
+        .filter(models.Image.id.in_(image_ids))
+        .options(
+            selectinload(models.Image.tags), # Also load tags
+            selectinload(models.Image.video_source)
+        )
+        .order_by(order_logic)
+    )
     return result.scalars().all()
 
 
@@ -246,25 +266,23 @@ async def get_or_create_tags_by_name(db: AsyncSession, tag_names: List[str]) -> 
         # Create all new tags
         new_tags = [models.Tag(name=name) for name in new_tag_names]
         db.add_all(new_tags)
-        # We need to flush to get the IDs of the new tags if we were to return them
-        # before the final commit, but we can let the main function commit.
-
+        
     return existing_tags + new_tags
 
 async def get_images_by_tag(
-    db: AsyncSession, 
-    tag_name: str, 
-    safe_mode: bool = False, 
-    media_type: str = 'all', 
-    skip: int = 0, 
+    db: AsyncSession,
+    tag_name: str,
+    safe_mode: bool = False,
+    media_type: str = 'all',
+    skip: int = 0,
     limit: int = 100
 ) -> List[models.Image]:
-    # ... (initial query setup is fine)
+    query = select(models.Image).join(models.Image.tags).filter(models.Tag.name == tag_name)
+    query = query.options(selectinload(models.Image.tags), selectinload(models.Image.video_source))
+
     if safe_mode:
         query = query.filter(models.Image.is_nsfw == False)
         
-    # ▼▼▼ THIS IS THE FIX ▼▼▼
-    # Use the 'query' variable consistently
     if media_type == 'video':
         query = query.filter(models.Image.video_source_id.isnot(None))
     elif media_type == 'image':
@@ -290,49 +308,39 @@ async def bulk_update_images(db: AsyncSession, action_request: schemas.BulkActio
         .filter(models.Image.id.in_(action_request.image_ids))
     )
     images_to_update = images_query.scalars().all()
-
-    # --- Perform the requested action ---
-
+    
     if action_request.action == 'add_tags' and isinstance(action_request.value, str):
         tag_names_str = action_request.value
         tag_names = [name.strip().lower() for name in tag_names_str.split(',') if name.strip()]
-        if not tag_names:
-            return 0
+        if not tag_names: return 0
         
         tags_to_add = await get_or_create_tags_by_name(db, tag_names)
         for image in images_to_update:
-            # Add new tags, avoiding duplicates
             existing_image_tags = {tag.name for tag in image.tags}
             for tag in tags_to_add:
                 if tag.name not in existing_image_tags:
                     image.tags.append(tag)
     
     elif action_request.action == 'set_nsfw' and isinstance(action_request.value, bool):
-        is_nsfw_value = action_request.value
         for image in images_to_update:
-            image.is_nsfw = is_nsfw_value
+            image.is_nsfw = action_request.value
 
     elif action_request.action == 'add_to_album':
-        # The 'value' should be the integer ID of the album
         try:
             album_id = int(action_request.value) if action_request.value is not None else None
             for image in images_to_update:
-                image.album_id = album_id # Set or unset the album_id
+                image.album_id = album_id
         except (ValueError, TypeError):
-            return 0 # Do nothing if the album ID is invalid
+            return 0 
 
     elif action_request.action == 'delete':
         for image in images_to_update:
-            # Use the existing utility function to delete the files
             utils_module.delete_image_files(image.filename, image.thumbnail_path)
-            # Then delete the image from the session
             await db.delete(image)
 
     else:
-        # If the action is unknown, do nothing
         return 0
         
-    # Commit all changes to the database at once
     await db.commit()
 
     return len(images_to_update)
@@ -344,16 +352,13 @@ async def get_album(db: AsyncSession, album_id: int) -> Optional[dict]:
     Get a single album by ID and a separate, sorted list of its images.
     Returns a dictionary to avoid lazy-loading issues.
     """
-    # Step 1: Get the album itself.
     album_result = await db.execute(
         select(models.Album).filter(models.Album.id == album_id)
     )
     album = album_result.scalars().first()
 
-    if not album:
-        return None
+    if not album: return None
         
-    # Step 2: Get all images for this album, sorted and with relationships.
     images_result = await db.execute(
         select(models.Image)
         .filter(models.Image.album_id == album_id)
@@ -365,7 +370,6 @@ async def get_album(db: AsyncSession, album_id: int) -> Optional[dict]:
     )
     images = images_result.scalars().all()
     
-    # Step 3: Return a simple dictionary.
     return {"album": album, "images": images}
 
 async def get_all_albums(db: AsyncSession) -> List:
@@ -373,7 +377,6 @@ async def get_all_albums(db: AsyncSession) -> List:
     Get a list of all albums, including a count of images in each.
     Returns a list of tuples (Album, image_count).
     """
-    # Create a subquery to count images per album
     image_count_subquery = (
         select(models.Image.album_id, func.count(models.Image.id).label("image_count"))
         .group_by(models.Image.album_id)
@@ -381,7 +384,6 @@ async def get_all_albums(db: AsyncSession) -> List:
     )
 
     query = (
-        # Use func.coalesce, just like func.count
         select(models.Album, func.coalesce(image_count_subquery.c.image_count, 0))
         .outerjoin(
             image_count_subquery, models.Album.id == image_count_subquery.c.album_id
@@ -404,9 +406,9 @@ async def delete_album(db: AsyncSession, album_id: int) -> Optional[models.Album
     """Deletes an album. Images within the album will have their album_id set to null."""
     db_album = await get_album(db, album_id=album_id)
     if db_album:
-        await db.delete(db_album)
+        await db.delete(db_album['album'])
         await db.commit()
-        return db_album
+        return db_album['album']
     return None
 
 # --- Video CRUD ---
@@ -428,7 +430,6 @@ async def get_gallery_statistics(db: AsyncSession) -> dict:
     statistics about the gallery.
     """
     
-    # Query 1: General Counts (images, videos, total size)
     counts_query = select(
         func.count(models.Image.id).label("total_count"),
         func.count(models.Image.video_source_id).label("video_count"),
@@ -441,8 +442,7 @@ async def get_gallery_statistics(db: AsyncSession) -> dict:
     video_items = counts_result.video_count or 0
     image_items = total_items - video_items
     total_size = (counts_result.total_size_images or 0) + (counts_result.total_size_videos or 0)
-
-    # Query 2: SFW vs NSFW Counts
+    
     nsfw_query = select(
         func.count(models.Image.id).label("total"),
         func.sum(case((models.Image.is_nsfw == True, 1), else_=0)).label("nsfw_count")
@@ -450,8 +450,7 @@ async def get_gallery_statistics(db: AsyncSession) -> dict:
     nsfw_result = (await db.execute(nsfw_query)).first()
     nsfw_items = nsfw_result.nsfw_count or 0
     sfw_items = (nsfw_result.total or 0) - nsfw_items
-
-    # Query 3: Top 10 most used tags
+    
     top_tags_query = (
         select(models.Tag.name, func.count(models.image_tags_association.c.image_id).label("tag_count"))
         .join(models.image_tags_association, models.Tag.id == models.image_tags_association.c.tag_id)
@@ -462,7 +461,6 @@ async def get_gallery_statistics(db: AsyncSession) -> dict:
     top_tags_result = await db.execute(top_tags_query)
     top_tags = top_tags_result.all()
 
-    # Query 4: Top 5 most used samplers
     top_samplers_query = (
         select(models.Image.sampler, func.count(models.Image.id).label("sampler_count"))
         .filter(models.Image.sampler.isnot(None))
@@ -472,8 +470,7 @@ async def get_gallery_statistics(db: AsyncSession) -> dict:
     )
     top_samplers_result = await db.execute(top_samplers_query)
     top_samplers = top_samplers_result.all()
-
-    # --- Assemble the final statistics dictionary ---
+    
     stats = {
         "total_items": total_items,
         "image_count": image_items,
@@ -485,12 +482,3 @@ async def get_gallery_statistics(db: AsyncSession) -> dict:
     }
     
     return stats
-
-async def get_images_by_ids(db: AsyncSession, image_ids: List[int]) -> List[models.Image]:
-    if not image_ids:
-        return []
-    result = await db.execute(
-        select(models.Image).filter(models.Image.id.in_(image_ids))
-        .options(selectinload(models.Image.video_source)) # Eager load for display
-    )
-    return result.scalars().all()

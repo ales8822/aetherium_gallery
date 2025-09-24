@@ -1,4 +1,4 @@
-<!-- templates/albums/album_detail.html (Final Version with Drag-and-Drop) -->
+<!-- templates/albums/album_detail.html (UPDATED with Frontend Fix) -->
 {% extends "base.html" %}
 
 {% block title %}{{ page_title }}{% endblock %}
@@ -10,8 +10,10 @@
         <h1>{{ album.name }}</h1>
         <p class="album-description">{{ album.description or "No description provided for this album."}}</p>
     </div>
-    <!-- ▼▼▼ ADD A BUTTON TO TOGGLE REORDERING MODE ▼▼▼ -->
-    <button type="button" id="reorder-button" class="button">Reorder Images</button>
+    <div class="button-group">
+        <button type="button" id="analyze-button" class="button">Analyze Aesthetic</button>
+        <button type="button" id="reorder-button" class="button">Reorder Images</button>
+    </div>
 </div>
 
 <p class="search-summary">
@@ -19,10 +21,6 @@
 </p>
 
 {% if images %}
-    <!-- 
-      We give the grid a specific ID so our JavaScript can find it easily.
-      We also add a data-album-id to store the album's ID for the API call.
-    -->
     <div id="album-grid-sortable" data-album-id="{{ album.id }}">
         {% include 'partials/gallery_grid.html' %}
     </div>
@@ -31,24 +29,30 @@
     <p>This album is currently empty. You can add images using the 'Select' tool in the main gallery.</p>
 {% endif %}
 
-<!-- The bulk actions panel is still useful here -->
-{% include 'partials/bulk_actions_panel.html' %}
 
+<div id="suggestions-container" class="suggestions-container" style="display: none;">
+    <h2 id="suggestions-title">Suggested Additions</h2>
+    <p id="suggestions-status">Analyzing this album's aesthetic to find matching images in your gallery...</p>
+    <div id="suggestions-grid" class="gallery-grid">
+        <!-- Suggestions will be dynamically inserted here -->
+    </div>
+</div>
+
+{% include 'partials/bulk_actions_panel.html' %}
 {% endblock %}
 
 
 {% block scripts_extra %}
-<!-- ▼▼▼ ADD THIS ENTIRE SCRIPT BLOCK ▼▼▼ -->
-<!-- 1. Include the SortableJS library from a CDN -->
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    // --- DRAG AND DROP REORDERING LOGIC ---
     const reorderButton = document.getElementById('reorder-button');
     const galleryGrid = document.getElementById('album-grid-sortable');
     const statusDiv = document.getElementById('reorder-status');
     const albumId = galleryGrid ? galleryGrid.dataset.albumId : null;
-    let sortableInstance = null; // To hold the SortableJS instance
+    let sortableInstance = null; 
 
     if (reorderButton && galleryGrid) {
         reorderButton.addEventListener('click', toggleReorderMode);
@@ -56,7 +60,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function toggleReorderMode() {
         if (sortableInstance) {
-            // If it's already active, destroy it to turn off reordering
             sortableInstance.destroy();
             sortableInstance = null;
             galleryGrid.classList.remove('reordering-active');
@@ -64,13 +67,7 @@ document.addEventListener('DOMContentLoaded', function () {
             reorderButton.classList.remove('active');
             statusDiv.textContent = '';
         } else {
-            // If it's not active, create it to enable reordering
-            sortableInstance = new Sortable(galleryGrid.querySelector('.gallery-grid'), {
-                animation: 150, // Animation speed
-                ghostClass: 'sortable-ghost', // Class for the drop placeholder
-                onEnd: handleDrop, // Function to call when dragging ends
-            });
-
+            sortableInstance = new Sortable(galleryGrid.querySelector('.gallery-grid'), { animation: 150, ghostClass: 'sortable-ghost', onEnd: handleDrop });
             galleryGrid.classList.add('reordering-active');
             reorderButton.textContent = 'Finish Reordering';
             reorderButton.classList.add('active');
@@ -79,39 +76,91 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function handleDrop(event) {
-        if (!albumId) {
-            console.error("Album ID is missing.");
-            return;
-        }
-
-        // Get the new order of all items in the grid by their data-id
+        if (!albumId) { console.error("Album ID is missing."); return; }
         const imageElements = Array.from(galleryGrid.querySelectorAll('.gallery-item'));
         const orderedImageIds = imageElements.map(item => parseInt(item.dataset.id, 10));
-
         statusDiv.textContent = 'Saving new order...';
         statusDiv.style.color = '#e0e0e0';
-
         try {
             const response = await fetch(`/api/album/${albumId}/reorder`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ image_ids: orderedImageIds }),
             });
-
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.detail || 'An unknown error occurred.');
             }
-
-            const result = await response.json();
             statusDiv.textContent = 'Order saved successfully!';
-            statusDiv.style.color = '#81c784'; // Green for success
-        
+            statusDiv.style.color = '#81c784';
         } catch (error) {
             console.error('Failed to save order:', error);
             statusDiv.textContent = `Error: ${error.message}`;
-            statusDiv.style.color = '#e57373'; // Red for error
+            statusDiv.style.color = '#e57373';
         }
+    }
+
+    // --- "CREATIVE DIRECTOR" LOGIC ---
+    const analyzeButton = document.getElementById('analyze-button');
+    const suggestionsContainer = document.getElementById('suggestions-container');
+    const suggestionsStatus = document.getElementById('suggestions-status');
+    const suggestionsGrid = document.getElementById('suggestions-grid');
+
+    analyzeButton.addEventListener('click', fetchSuggestions);
+
+    async function fetchSuggestions() {
+        if (!albumId) { console.error("Album ID is missing for suggestions."); return; }
+
+        suggestionsGrid.innerHTML = '';
+        suggestionsStatus.textContent = "Analyzing this album's aesthetic to find matching images in your gallery...";
+        suggestionsContainer.style.display = 'block';
+        analyzeButton.disabled = true;
+        analyzeButton.classList.add('loading');
+
+        try {
+            const response = await fetch(`/api/album/${albumId}/suggestions`);
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || "Failed to fetch suggestions.");
+            }
+            const suggestedImages = await response.json();
+            if (suggestedImages.length === 0) {
+                suggestionsStatus.textContent = "No new matching images were found in your gallery.";
+            } else {
+                suggestionsStatus.textContent = `Found ${suggestedImages.length} images that might be a great fit for this album!`;
+                renderSuggestions(suggestedImages);
+            }
+        
+        } catch(error) {
+            console.error('Failed to fetch suggestions:', error);
+            suggestionsStatus.textContent = `An error occurred: ${error.message}`;
+            suggestionsStatus.style.color = '#e57373';
+        } finally {
+            analyzeButton.disabled = false;
+            analyzeButton.classList.remove('loading');
+        }
+    }
+
+    // ▼▼▼ THIS FUNCTION IS NOW FIXED ▼▼▼
+    function renderSuggestions(images) {
+        suggestionsGrid.innerHTML = images.map(image => {
+            // FIX: Use image.thumbnail_path directly from the API response.
+            // This is the correct and robust way to get the thumbnail URL.
+            const thumbnailUrl = image.thumbnail_path; 
+
+            const videoIndicator = image.is_video ? '<span class="video-indicator">▶</span>' : '';
+            const nsfwClass = image.is_nsfw ? 'is-nsfw' : '';
+
+            return `
+                <div class="gallery-item ${nsfwClass}" data-id="${image.id}" data-type="${image.is_video ? 'video' : 'image'}">
+                    <a href="/image/${image.id}">
+                        <img src="${thumbnailUrl}" alt="${image.prompt || 'Gallery image'}" loading="lazy">
+                        ${videoIndicator}
+                        <div class="select-checkbox"></div>
+                    </a>
+                </div>
+            `;
+        }).join('');
     }
 });
 </script>
