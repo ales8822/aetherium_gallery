@@ -43,6 +43,85 @@
 .metadata-editor.edit-mode .copy-button, 
 .metadata-editor.edit-mode .generate-inline-button { display:none }
 .generate-inline-button.loading svg { animation: spin 1s linear infinite; }
+.metadata-modal {
+    background: #2a2a2a; color: #e0e0e0;
+    padding: 2rem; border-radius: 8px;
+    max-width: 800px; width: 100%;
+    max-height: 80vh; overflow-y: auto;
+}
+.metadata-modal h2 { margin-top: 0; }
+.metadata-editor-grid { display: grid; grid-template-columns: 200px 1fr 40px; gap: 0.5rem; align-items: center; margin-bottom: 1rem; }
+.metadata-editor-grid input { width: 100%; }
+.metadata-modal .form-actions { margin-top: 1rem; border-top: 1px solid #444; padding-top: 1rem; text-align: right; }
+
+.disabled-input {
+    background-color: #3f3f3f;
+    color: #888;
+    cursor: not-allowed;
+    border-color: #555;
+}
+.metadata-editor-grid .remove-field-btn {
+    opacity: 1; transition: opacity 0.2s;
+}
+.metadata-editor-grid.marked-for-deletion {
+    opacity: 0.5;
+}
+.metadata-editor-grid.marked-for-deletion .remove-field-btn {
+    opacity: 0;
+}
+.metadata-editor-grid input,
+.metadata-editor-grid textarea {
+    width: 100%;
+    box-sizing: border-box; /* Ensures padding is included in the width */
+}
+
+/* ▼▼▼ ADD THIS NEW RULE ▼▼▼ */
+.metadata-editor-grid textarea {
+    min-height: 80px; /* Give it some initial height */
+    resize: vertical;   /* Allow the user to resize it vertically */
+    font-family: monospace; /* Best for code/JSON */
+}
+.metadata-value-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.view-full-data-link {
+    font-size: 0.8em;
+    color: #8cb4ff;
+    cursor: pointer;
+    text-decoration: underline;
+    align-self: flex-start;
+}
+.view-full-data-link:hover {
+    color: #c5d7ff;
+}
+.metadata-modal {
+    /* ... existing modal styles ... */
+    display: flex; /* New */
+    flex-direction: column; /* New */
+}
+.metadata-modal h2 { flex-shrink: 0; } /* New */
+.metadata-modal-content {
+    flex-grow: 1; /* New: Make this area take up available space */
+    overflow-y: auto; /* New: Add a scrollbar if content overflows */
+    padding-right: 1rem; /* New: Add space for the scrollbar */
+    margin-right: -1rem; /* New: Offset padding for alignment */
+}
+.metadata-modal .form-actions { flex-shrink: 0; } /* New */
+.full-data-viewer {
+    background: #1e1e1e;
+    color: #e0e0e0;
+    padding: 1.5rem;
+    max-height: 80vh; /* Set a maximum height */
+    max-width: 900px;
+    overflow-y: auto;  /* Add a vertical scrollbar when needed */
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: monospace;
+    font-size: 0.9em;
+}
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 </style>
 {% endblock %}
@@ -235,6 +314,8 @@
                 </div>
             </div>
 
+            <button type="button" id="edit-exif-button" class="button-secondary">Edit Embedded Metadata</button>
+
             {% if not image.video_source %}
             <a href="{{ url_for('find_similar', image_id=image.id) }}" class="button" title="Find Visually Similar Images">Find Similar</a>
             {% endif %}
@@ -262,89 +343,51 @@
 {% endblock %}
 
 {% block scripts_extra %}
+{{ super() }} <!-- This line is crucial. It inherits scripts from base.html (like basicLightbox) -->
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    // --- [1] GLOBAL ELEMENTS & STATE ---
     const editorPanel = document.getElementById('metadata-editor-panel');
-    const editButton = document.getElementById('edit-button');
-    const saveButton = document.getElementById('save-button');
-    const cancelButton = document.getElementById('cancel-button');
-    const editForm = document.getElementById('edit-form');
-    const statusMessage = document.getElementById('status-message');
     const imageId = editorPanel.dataset.imageId;
-    // --- Event Listeners ---
-    editButton.addEventListener('click', enterEditMode);
-    cancelButton.addEventListener('click', leaveEditMode);
-    saveButton.addEventListener('click', saveChanges);
+    const statusMessage = document.getElementById('status-message');
+    const editForm = document.getElementById('edit-form');
+    let lightboxInstance = null; // To hold the metadata editor lightbox
+    
+    // This cache will hold the TRUE, untruncated value of each metadata field
+    // while the editor is open.
+    let fullMetadataCache = {};
 
-    // ▼▼▼ NEW: Using event delegation for all actions inside the editor panel ▼▼▼
+    // --- [2] MASTER EVENT LISTENER (EVENT DELEGATION) ---
+    // This single listener handles all clicks on the main metadata panel.
     editorPanel.addEventListener('click', function(event) {
-        const generateButton = event.target.closest('.generate-inline-button');
-        const copyButton = event.target.closest('.copy-button');
-        const editButton = event.target.closest('#edit-button');
-        const saveButton = event.target.closest('#save-button');
-        const cancelButton = event.target.closest('#cancel-button');
+        const target = event.target;
         
+        // --- ROUTE CLICKS TO THE CORRECT HANDLER ---
+        const generateButton = target.closest('.generate-inline-button');
+        const copyButton = target.closest('.copy-button');
+        const editButton = target.closest('#edit-button');
+        const saveButton = target.closest('#save-button');
+        const cancelButton = target.closest('#cancel-button');
+        const exifButton = target.closest('#edit-exif-button');
+
         if (generateButton) {
             handleAIGeneration(generateButton);
         } else if (copyButton) {
             handleCopy(copyButton);
         } else if (editButton) {
             enterEditMode();
+        } else if (saveButton) {
+            saveStandardChanges();
         } else if (cancelButton) {
             leaveEditMode();
-        } else if (saveButton) {
-            saveChanges();
+        } else if (exifButton) {
+            handleOpenEmbeddedDataEditor();
         }
     });
-    
-    // ▼▼▼ NEW: Modular AI generation handler ▼▼▼
-    function handleAIGeneration(buttonElement) {
-        const source = buttonElement.dataset.source;
-        const isPrompt = source === 'gemini';
-        const message = isPrompt 
-            ? "This will overwrite the current prompt with a new AI-generated description. Are you sure?"
-            : "This will add new AI-generated tags to the existing ones. Are you sure?";
 
-        if (!confirm(message)) return;
-        
-        const originalIconSVG = buttonElement.innerHTML;
-        const loadingSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" d="M0 0h24v24H0z"/><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" opacity=".3"/><path d="M12 4a8 8 0 0 1 0 16z"/></svg>`;
-        buttonElement.innerHTML = loadingSVG; // Replace icon with a simple spinner for loading
-        buttonElement.classList.add('loading');
-        buttonElement.disabled = true;
+    // --- [3] HANDLER FUNCTIONS ---
 
-        statusMessage.textContent = `Requesting AI ${isPrompt ? 'description' : 'tags'}... This can take a moment.`;
-        statusMessage.style.color = '#e0e0e0';
-
-        fetch(`/api/generation/caption/${imageId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ source: source }) // Pass the specific source
-        })
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(err => { throw new Error(err.detail || 'Unknown error'); });
-            }
-            return response.json();
-        })
-        .then(data => {
-            statusMessage.textContent = 'Successfully generated and saved! Reloading...';
-            statusMessage.style.color = '#81c784';
-            setTimeout(() => { window.location.reload(); }, 1000);
-        })
-        .catch(error => {
-            console.error('Error generating AI content:', error);
-            statusMessage.textContent = `Error: ${error.message}`;
-            statusMessage.style.color = '#e57373';
-        })
-        .finally(() => {
-            // Restore button even on failure
-            buttonElement.innerHTML = originalIconSVG;
-            buttonElement.classList.remove('loading');
-            buttonElement.disabled = false;
-        });
-    }
-
+    // --- Standard Metadata Editor (Handles fields like prompt, tags, etc. saved in the DB) ---
     function enterEditMode() {
         editorPanel.classList.add('edit-mode');
     }
@@ -352,112 +395,305 @@ document.addEventListener('DOMContentLoaded', function () {
     function leaveEditMode() {
         editorPanel.classList.remove('edit-mode');
         statusMessage.textContent = '';
-        // Note: We don't reset the form on cancel in case the user
-        // wants to re-enter edit mode without losing their changes.
     }
-
-    function handleGenerateCaption() {
-        if (!confirm("This will overwrite the current prompt and add new tags. Are you sure you want to continue?")) {
-            return;
-        }
-
-        const originalButtonHtml = generateCaptionButton.innerHTML;
-        generateCaptionButton.innerHTML = "Generating...";
-        generateCaptionButton.disabled = true;
-        statusMessage.textContent = 'Requesting AI caption... This may take a moment.';
-        statusMessage.style.color = '#e0e0e0';
-
-        fetch(`/api/generation/caption/${imageId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-        })
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(err => { throw new Error(err.detail || 'Unknown error'); });
-            }
-            return response.json();
-        })
-        .then(data => {
-            statusMessage.textContent = 'Successfully generated and saved! Reloading...';
-            statusMessage.style.color = '#81c784';
-            setTimeout(() => { window.location.reload(); }, 1500);
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            statusMessage.textContent = `Error generating caption: ${error.message}`;
-            statusMessage.style.color = '#e57373';
-            generateCaptionButton.innerHTML = originalButtonHtml;
-            generateCaptionButton.disabled = false;
-        });
-    }
-
-     function saveChanges() {
+    
+    async function saveStandardChanges() {
         const formData = new FormData(editForm);
         const updateData = {};
-
-        // Define which keys should be treated as integers or floats
         const integerFields = ['seed', 'steps'];
         const floatFields = ['cfg_scale'];
 
         for (const [key, value] of formData.entries()) {
             const trimmedValue = value.trim();
-
             if (integerFields.includes(key)) {
-                // If it's an integer field and not empty, parse it. Otherwise, set to null.
                 updateData[key] = trimmedValue !== '' ? parseInt(trimmedValue, 10) : null;
             } else if (floatFields.includes(key)) {
-                // If it's a float field and not empty, parse it. Otherwise, set to null.
                 updateData[key] = trimmedValue !== '' ? parseFloat(trimmedValue) : null;
             } else if (key === 'album_id') {
-                // Handle album_id separately as before
                 updateData[key] = trimmedValue === '' ? null : parseInt(trimmedValue, 10);
             } else {
-                // All other fields are treated as strings
                 updateData[key] = value;
             }
         }
-
-        // Handle the boolean checkbox separately
         updateData['is_nsfw'] = editForm.elements['is_nsfw'].checked;
         
-        // Final check for NaN values from failed parsing (e.g., user enters "abc" in a number field)
         for (const key in updateData) {
             if (typeof updateData[key] === 'number' && isNaN(updateData[key])) {
-                updateData[key] = null; // Convert any invalid numbers to null
+                updateData[key] = null;
             }
         }
         
         statusMessage.textContent = 'Saving...';
-        statusMessage.style.color = '#e0e0eota';
+        statusMessage.style.color = '#e0e0e0';
 
-        fetch(`/api/images/${imageId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updateData),
-        })
-        .then(response => {
+        try {
+            const response = await fetch(`/api/images/${imageId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updateData),
+            });
             if (!response.ok) {
-                return response.json().then(err => { 
-                    // Create a readable error string from the validation response
-                    let errorMsg = err.detail || 'Unknown error';
-                    if (Array.isArray(err.detail)) {
-                       errorMsg = err.detail.map(e => e.msg).join('; ');
-                    }
-                    throw new Error(errorMsg); 
-                });
+                const err = await response.json();
+                let errorMsg = err.detail || 'Unknown error';
+                if (Array.isArray(err.detail)) {
+                    errorMsg = err.detail.map(e => e.msg).join('; ');
+                }
+                throw new Error(errorMsg); 
             }
-            return response.json();
-        })
-        .then(updatedImage => {
             statusMessage.textContent = 'Successfully saved! Reloading...';
             statusMessage.style.color = '#81c784';
             setTimeout(() => { window.location.reload(); }, 1000);
-        })
-        .catch(error => {
-            console.error('Error:', error);
+        } catch (error) {
+            console.error('Error saving changes:', error);
             statusMessage.textContent = `Error: ${error.message}`;
             statusMessage.style.color = '#e57373';
+        }
+    }
+    
+    // --- AI Generation ---
+    async function handleAIGeneration(buttonElement) {
+        const source = buttonElement.dataset.source;
+        let message = "This will generate new content. Are you sure?";
+        if (source === 'gemini') message = "Overwrite the prompt with a new AI description?";
+        else if (source === 'wd14') message = "Add new AI tags to the existing ones?";
+        else if (source === 'all') message = "Overwrite prompt AND add new tags?";
+
+        if (!confirm(message)) return;
+        
+        const originalIconSVG = buttonElement.innerHTML;
+        const allGenButtons = editorPanel.querySelectorAll('.generate-inline-button');
+        
+        (source === 'all' ? allGenButtons : [buttonElement]).forEach(btn => {
+            btn.classList.add('loading');
+            btn.disabled = true;
         });
+
+        statusMessage.textContent = `Requesting AI generation (${source})...`;
+        statusMessage.style.color = '#e0e0e0';
+
+        try {
+            const response = await fetch(`/api/generation/caption/${imageId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ source: source })
+            });
+            if (!response.ok) throw new Error((await response.json()).detail);
+
+            statusMessage.textContent = 'Successfully generated and saved! Reloading...';
+            statusMessage.style.color = '#81c784';
+            setTimeout(() => window.location.reload(), 1500);
+        } catch(error) {
+            console.error('Error generating AI content:', error);
+            statusMessage.textContent = `Error: ${error.message}`;
+            statusMessage.style.color = '#e57373';
+        } finally {
+            allGenButtons.forEach(btn => {
+                btn.classList.remove('loading');
+                btn.disabled = false;
+            });
+            buttonElement.innerHTML = originalIconSVG;
+        }
+    }
+
+    // --- Embedded Metadata (Pillow-based, in-file) ---
+    async function handleOpenEmbeddedDataEditor() {
+        const button = document.getElementById('edit-exif-button');
+        button.disabled = true;
+        button.textContent = "Loading...";
+
+        try {
+            const response = await fetch(`/api/embedded-data/${imageId}`);
+            if (!response.ok) throw new Error((await response.json()).detail);
+            
+            const data = await response.json();
+            const editorHtml = buildEmbeddedDataEditorHtml(data.user_data, data.tech_data);
+            
+            lightboxInstance = basicLightbox.create(editorHtml, {
+                onShow: (instance) => {
+                    const modal = instance.element();
+                    modal.querySelector('#save-exif-btn').onclick = handleSaveEmbeddedData;
+                    modal.querySelector('#add-exif-btn').onclick = addEmbeddedDataRow;
+                    
+                    const contentContainer = modal.querySelector('.metadata-modal-content');
+
+                    // Master listener for all actions within the modal's content area
+                    contentContainer.addEventListener('input', (e) => {
+                        if (e.target.classList.contains('exif-value')) {
+                            updateRowState(e.target);
+                        }
+                    });
+
+                    contentContainer.addEventListener('click', (e) => {
+                        const target = e.target;
+                        if (target.classList.contains('remove-field-btn')) {
+                            target.closest('.metadata-editor-grid').remove();
+                        } else if (target.classList.contains('view-full-data-link')) {
+                            const row = target.closest('.metadata-editor-grid');
+                            const id = row.dataset.id;
+                            const fullValue = fullMetadataCache[id] || '';
+        
+        // THE FIX IS HERE: The variable must be named 'contentHtml' to match
+        // the variable being used in the create() function call below.
+        const contentHtml = `<div class="full-data-viewer">${fullValue}</div>`;
+        
+        basicLightbox.create(contentHtml).show();
+    }
+});
+
+                    // Initialize the display state for all pre-existing rows when the modal opens
+                    modal.querySelectorAll('.metadata-editor-grid').forEach(row => {
+                        updateRowState(row.querySelector('.exif-value'));
+                    });
+                }
+            });
+            lightboxInstance.show();
+
+        } catch(error) {
+            alert(`Error: ${error.message}`);
+        } finally {
+            button.disabled = false;
+            button.textContent = "Edit Embedded Metadata";
+        }
+    }
+    
+    function buildEmbeddedDataEditorHtml(userMetadata, techMetadata) {
+        fullMetadataCache = {}; // Reset cache on each open
+        let userHtml = '', techHtml = '';
+
+        if (userMetadata) {
+            for (const [key, value] of Object.entries(userMetadata).sort()) {
+                userHtml += createEmbeddedDataRowHtml(key, value, true);
+            }
+        }
+        if (techMetadata) {
+            delete techMetadata['icc_profile']; // Filter out noisy data
+            for (const [key, value] of Object.entries(techMetadata).sort()) {
+                techHtml += createEmbeddedDataRowHtml(key, value, false);
+            }
+        }
+        
+        return `
+            <div class="metadata-modal">
+                <h2>Embedded Metadata</h2>
+                <div class="metadata-modal-content">
+                    <h3>User-Defined Data (Editable)</h3>
+                    <div id="exif-editor-user-container">${userHtml}</div>
+                    <button type="button" id="add-exif-btn" class="button-secondary">Add Field</button>
+                    <h3 style="margin-top: 1.5rem;">Technical Info (Read-Only)</h3>
+                    <div id="exif-editor-tech-container">${techHtml}</div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" id="save-exif-btn" class="button-primary">Save Changes</button>
+                </div>
+            </div>`;
+    }
+
+    function createEmbeddedDataRowHtml(key, value, isEditable) {
+        const valueStr = String(value);
+        // Create a unique ID to link the row's DOM element to its full data in the cache
+        const uniqueId = `meta-${Math.random().toString(36).substring(2, 9)}`;
+        fullMetadataCache[uniqueId] = valueStr; // Cache the full original value
+
+        const readonlyClass = isEditable ? '' : 'disabled-input';
+        const readonlyAttr = isEditable ? '' : 'readonly';
+        
+        return `
+            <div class="metadata-editor-grid ${isEditable ? 'is-editable' : ''}" data-id="${uniqueId}">
+                <input type="text" class="exif-key ${readonlyClass}" value="${key}" ${readonlyAttr}>
+                <div class="metadata-value-wrapper">
+                    <input type="text" class="exif-value ${readonlyClass}" value="" ${readonlyAttr}> <!-- Value will be set by updateRowState -->
+                    <a class="view-full-data-link" style="display: none;">View full data</a>
+                </div>
+                ${isEditable ? '<button type="button" class="remove-field-btn">&times;</button>' : '<div></div>'}
+            </div>`;
+    }
+
+    function updateRowState(inputElement) {
+        if (!inputElement) return;
+        const wrapper = inputElement.parentElement;
+        const row = wrapper.closest('.metadata-editor-grid');
+        const link = wrapper.querySelector('.view-full-data-link');
+        const id = row.dataset.id;
+        
+        // When the user types, update our cache with the new full value
+        if (inputElement === document.activeElement) {
+             fullMetadataCache[id] = inputElement.value;
+        }
+
+        const fullValue = fullMetadataCache[id] || "";
+        const isComplex = fullValue.includes('\n') || fullValue.length > 80;
+
+        if (isComplex) {
+            // If the text is complex, truncate it for the input field display
+            inputElement.value = fullValue.substring(0, 80).replace(/\n/g, '↵') + '...';
+            link.style.display = 'inline';
+        } else {
+            // If the text is simple, show the full value and hide the link
+            inputElement.value = fullValue;
+            link.style.display = 'none';
+        }
+    }
+    
+    function addEmbeddedDataRow() {
+        const container = document.getElementById('exif-editor-user-container');
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = createEmbeddedDataRowHtml("", "", true); // Create a new empty row
+        const newRow = tempDiv.firstElementChild;
+        container.appendChild(newRow);
+        
+        updateRowState(newRow.querySelector('.exif-value')); // Initialize its display state
+        newRow.querySelector('.exif-key').focus();
+    }
+
+    async function handleSaveEmbeddedData() {
+        const userContainer = document.getElementById('exif-editor-user-container');
+        const rows = userContainer.querySelectorAll('.metadata-editor-grid.is-editable');
+        const newUserData = {};
+        
+        rows.forEach(row => {
+            const key = row.querySelector('.exif-key').value.trim();
+            const id = row.dataset.id;
+            // IMPORTANT: Get the full, untruncated value from our cache, not the (possibly truncated) input field
+            const value = fullMetadataCache[id] || '';
+            if (key) {
+                newUserData[key] = value;
+            }
+        });
+
+        const saveButton = lightboxInstance.element().querySelector('#save-exif-btn');
+        saveButton.disabled = true;
+        saveButton.textContent = "Saving...";
+
+        try {
+            const response = await fetch(`/api/embedded-data/${imageId}`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ user_data: newUserData })
+            });
+            if (!response.ok) throw new Error((await response.json()).detail);
+            
+            alert("Embedded metadata saved successfully!");
+            if(lightboxInstance) lightboxInstance.close();
+        } catch(error) {
+            alert(`Error saving embedded data: ${error.message}`);
+        } finally {
+            saveButton.disabled = false;
+            saveButton.textContent = "Save Changes";
+        }
+    }
+    
+    // --- Utility Function ---
+    function handleCopy(copyButton) {
+        const wrapper = copyButton.closest('dd');
+        const target = wrapper.querySelector('.copy-target');
+        if (!target) return;
+        const textToCopy = target.dataset.copyText || target.innerText || target.textContent;
+        navigator.clipboard.writeText(textToCopy.trim())
+            .then(() => {
+                const originalHTML = copyButton.innerHTML;
+                copyButton.innerHTML = '✓';
+                setTimeout(() => { copyButton.innerHTML = originalHTML; }, 1500);
+            }).catch(err => console.error('Failed to copy text:', err));
     }
 });
 </script>

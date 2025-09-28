@@ -24,7 +24,7 @@ class CaptionService:
         else:
             try:
                 genai.configure(api_key=google_api_key)
-                self.gemini_model = genai.GenerativeModel('gemini-1.5-flash-latest')
+                self.gemini_model = genai.GenerativeModel('gemini-2.0-flash')
                 logger.info("Gemini 1.5 Flash model configured successfully.")
             except Exception as e:
                 self.gemini_model = None
