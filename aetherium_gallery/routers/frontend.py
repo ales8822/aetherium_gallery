@@ -194,3 +194,24 @@ async def show_similar_images(
         "now": datetime.datetime.now,
         "safe_mode": request.cookies.get("safe_mode", "off") == "on"
     })
+
+@router.get("/map", response_class=HTMLResponse, name="constellation_map")
+async def show_constellation_map(request: Request):
+    """Serves the Constellation Map visualization page."""
+    return templates.TemplateResponse("constellation_map.html", {
+        "request": request,
+        "page_title": "Constellation Map",
+        "now": datetime.datetime.now,
+    })
+
+# Add a "Generate Map" button on the Stats page for now
+@router.get("/stats", response_class=HTMLResponse, name="view_stats")
+async def view_statistics(request: Request, db: AsyncSession = Depends(get_db)):
+    # ... (existing stats logic)
+    stats_data = await crud.get_gallery_statistics(db)
+    return templates.TemplateResponse("stats.html", {
+        "request": request,
+        "stats": stats_data,
+        "page_title": "Gallery Statistics",
+        "now": datetime.datetime.now,
+    })

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Dict
 from datetime import datetime
 
 
@@ -80,6 +80,9 @@ class Image(ImageBase):
     # This will be populated later
     album: Optional['AlbumInfo'] = None
     video_source: Optional[VideoSource] = None
+    # Allow the map coordinates to be optional (they might be null)
+    map_x: Optional[float] = None
+    map_y: Optional[float] = None
     class Config:
         from_attributes = True # Pydantic V2 uses this instead of orm_mode
 

@@ -125,6 +125,26 @@ class VectorService:
         
         index = faiss.IndexFlatIP(self.embedding_dim)
         return index, {}, []
+    
+    def get_all_vectors(self) -> tuple[np.ndarray, list[int]] | tuple[None, None]:
+        """
+        Exports all vectors from the FAISS index along with their corresponding
+        database image IDs.
+        
+        Returns:
+            A tuple containing a numpy array of all vectors and a list of image IDs,
+            or (None, None) if the index is empty.
+        """
+        index, _, index_to_id = self._load_or_create_index()
+        if index.ntotal == 0:
+            return None, None
+            
+        logger.info(f"Exporting all {index.ntotal} vectors from the FAISS index.")
+        
+        # Reconstruct all vectors from the index
+        all_vectors = index.reconstruct_n(0, index.ntotal)
+        
+        return all_vectors, index_to_id
 
 try:
     vector_service = VectorService()

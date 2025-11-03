@@ -20,3 +20,6 @@ sentence-transformers
 google-generativeai
 
 gradio_client
+umap-learn
+numpy 
+scikit-learn

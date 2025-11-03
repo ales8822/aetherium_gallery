@@ -61,6 +61,10 @@ class Image(Base):
     content_type = Column(String, nullable=True)
     size_bytes = Column(Integer, nullable=True)
 
+    # Coordinates for the Constellation Map
+    map_x = Column(Float, nullable=True)
+    map_y = Column(Float, nullable=True)
+    
     # Metadata
     prompt = Column(Text, nullable=True)
     negative_prompt = Column(Text, nullable=True)

@@ -19,7 +19,7 @@ from .routers.api import images_api as images_api
 from .routers.api import generation as generation_api # New import
 from .services.caption_service import CaptionService
 from .routers.api import metadata as metadata_api
-
+from .routers.api import tasks as tasks_api
 # --- Logging Setup ---
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -83,6 +83,7 @@ app.include_router(albums_api.router)
 app.include_router(images_api.router)
 app.include_router(generation_api.router) # Include the new router
 app.include_router(metadata_api.router)
+app.include_router(tasks_api.router)
 
 # --- Generic Exception Handler ---
 @app.exception_handler(Exception)

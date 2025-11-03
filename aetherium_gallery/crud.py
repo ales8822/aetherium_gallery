@@ -2,10 +2,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy import or_, func, case, update # Add 'case' for ordering
-from typing import List, Optional
+from typing import List, Optional, Dict
+import logging
 
 from . import models, schemas
 
+logger = logging.getLogger(__name__)
 
 # --- Image CRUD ---
 
@@ -482,3 +484,46 @@ async def get_gallery_statistics(db: AsyncSession) -> dict:
     }
     
     return stats
+
+# constelation methods
+async def batch_update_image_coordinates(db: AsyncSession, coordinates: List[Dict]) -> int:
+    """
+    Updates the map_x and map_y coordinates for multiple images in a single transaction.
+    
+    Args:
+        db: The AsyncSession object.
+        coordinates: A list of dictionaries, where each dict is {'id': image_id, 'x': x_val, 'y': y_val}.
+        
+    Returns:
+        The number of updated rows.
+    """
+    if not coordinates:
+        return 0
+    
+    try:
+        # We use SQLAlchemy Core's 'update' for efficient bulk updates.
+        await db.execute(
+            update(models.Image),
+            coordinates
+        )
+        await db.commit()
+        logger.info(f"Successfully updated coordinates for {len(coordinates)} images.")
+        return len(coordinates)
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Failed to batch update coordinates: {e}", exc_info=True)
+        return 0
+
+
+async def get_all_plotted_images(db: AsyncSession) -> List[models.Image]:
+    """
+    Fetches all images that have valid (non-null) map coordinates.
+    """
+    query = (
+        select(models.Image)
+        .filter(models.Image.map_x.isnot(None), models.Image.map_y.isnot(None))
+        # Eagerly load data needed for the frontend visualization
+        .options(selectinload(models.Image.tags))
+    )
+    result = await db.execute(query)
+    return result.scalars().all()

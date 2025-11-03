@@ -7,11 +7,13 @@
     <link rel="stylesheet" href="{{ url_for('static', path='/css/stats.css') }}">
 {% endblock %}
 
+
 {% block content %}
 <h1>{{ page_title }}</h1>
 
 <!-- Overview Cards -->
 <div class="stats-grid">
+    <!-- ... your stat cards here ... -->
     <div class="stat-card">
         <h3>Total Items</h3>
         <div class="value">{{ stats.total_items }}</div>
@@ -19,7 +21,8 @@
     </div>
     <div class="stat-card">
         <h3>Total Size</h3>
-        <div class="value">{{ stats.total_size_formatted }}</div>
+        <!-- This assumes you add 'total_size_formatted' in your backend -->
+        <div class="value">{{ stats.get('total_size_formatted', 'N/A') }}</div>
     </div>
     <div class="stat-card">
         <h3>Content Safety</h3>
@@ -30,27 +33,22 @@
 
 <!-- Detailed Lists -->
 <div class="list-grid">
+    <!-- ... your top tags and top samplers tables here ... -->
     <div class="list-card">
         <h2>Top 10 Tags</h2>
         {% if stats.top_tags %}
         <table class="stats-table">
             <thead>
-                <tr>
-                    <th>Tag Name</th>
-                    <th class="count-cell">Count</th>
-                </tr>
+                <tr><th>Tag Name</th><th class="count-cell">Count</th></tr>
             </thead>
             <tbody>
                 {% for tag in stats.top_tags %}
-                <tr>
-                    <td>{{ tag.name }}</td>
-                    <td class="count-cell">{{ tag.count }}</td>
-                </tr>
+                <tr><td>{{ tag.name }}</td><td class="count-cell">{{ tag.count }}</td></tr>
                 {% endfor %}
             </tbody>
         </table>
         {% else %}
-        <p style="padding: 1.5rem;">No tags have been used yet.</p>
+        <p>No tags have been used yet.</p>
         {% endif %}
     </div>
 
@@ -59,24 +57,71 @@
         {% if stats.top_samplers %}
         <table class="stats-table">
             <thead>
-                <tr>
-                    <th>Sampler Name</th>
-                    <th class="count-cell">Count</th>
-                </tr>
+                <tr><th>Sampler Name</th><th class="count-cell">Count</th></tr>
             </thead>
             <tbody>
                 {% for sampler in stats.top_samplers %}
-                <tr>
-                    <td>{{ sampler.name }}</td>
-                    <td class="count-cell">{{ sampler.count }}</td>
-                </tr>
+                <tr><td>{{ sampler.name }}</td><td class="count-cell">{{ sampler.count }}</td></tr>
                 {% endfor %}
             </tbody>
         </table>
          {% else %}
-        <p style="padding: 1.5rem;">No samplers have been recorded yet.</p>
+        <p>No samplers have been recorded yet.</p>
         {% endif %}
     </div>
 </div>
 
+<div class="stats-actions">
+    <h2>Admin Actions</h2>
+    <p>These actions can be resource-intensive and may take some time to complete.</p>
+    <button type="button" id="calculate-map-btn" class="button-primary">Generate / Update Constellation Map</button>
+    <div id="map-status" style="margin-top: 1rem;"></div>
+</div>
+{% endblock %} <!-- This is the CORRECT end for the 'content' block -->
+
+
+<!-- ▼▼▼ THE SCRIPT BLOCK IS NOW OUTSIDE AND AFTER THE CONTENT BLOCK ▼▼▼ -->
+{% block scripts_extra %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const calculateBtn = document.getElementById('calculate-map-btn');
+    const statusDiv = document.getElementById('map-status');
+
+    if (calculateBtn) { // Add a check to be safe
+        calculateBtn.addEventListener('click', async () => {
+            if (!confirm('This will recalculate the entire Constellation Map. It can be slow. Continue?')) {
+                return;
+            }
+
+            calculateBtn.disabled = true;
+            calculateBtn.textContent = 'Calculating...';
+            statusDiv.textContent = 'Please wait. This may take several minutes...';
+            statusDiv.style.color = '#e0e0e0';
+
+            try {
+                const response = await fetch('/api/tasks/calculate-map', {
+                    method: 'POST'
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'Calculation failed');
+                }
+
+                const result = await response.json();
+                statusDiv.innerHTML = `Success! ${result.message}. <a href="{{ url_for('constellation_map') }}">View Map</a>`;
+                statusDiv.style.color = '#81c784';
+
+            } catch (error) {
+                statusDiv.textContent = `Error: ${error.message}`;
+                statusDiv.style.color = '#e57373';
+            } finally {
+                calculateBtn.disabled = false;
+                calculateBtn.textContent = 'Generate / Update Constellation Map';
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

@@ -1,0 +1,105 @@
+<!-- templates/constellation_map.html (NEW FILE) -->
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block head_extra %}
+{{ super() }}
+<!-- Load the Plotly.js library from a CDN -->
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js" charset="utf-8"></script>
+<style>
+    #constellation-map {
+        width: 100%;
+        height: 80vh; /* Make the map take up most of the screen height */
+        background-color: #111; /* Dark background for a space feel */
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Constellation Map</h1>
+<p>Explore a visual universe of your gallery. Clusters of points represent stylistically similar images. Hover over a point to see a preview, and click to go to the image page.</p>
+<div id="constellation-map">
+    <div class="loading-spinner" style="display: flex; height: 100%;">
+        <div class="spinner"></div>
+        <div>Loading Map Data...</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts_extra %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const mapDiv = document.getElementById('constellation-map');
+
+    async function renderMap() {
+        try {
+            // 1. Fetch the data from our API
+            const response = await fetch('/api/tasks/map-data');
+            if (!response.ok) throw new Error('Failed to load map data.');
+            
+            const images = await response.json();
+
+            if (images.length === 0) {
+                mapDiv.innerHTML = '<p>No map data found. Please generate the map from the Stats page first.</p>';
+                return;
+            }
+
+            // 2. Prepare the data for Plotly.js
+            const plotData = {
+                x: images.map(img => img.map_x),
+                y: images.map(img => img.map_y),
+                mode: 'markers',
+                type: 'scattergl', // Use WebGL for better performance with many points
+                marker: {
+                    size: 8,
+                    color: '#64b5f6',
+                    opacity: 0.7
+                },
+                text: images.map(img => img.original_filename), // Tooltip text
+                // Custom data to store extra info for each point
+                customdata: images.map(img => ({
+                    thumbnail: `/uploads/${img.thumbnail_path}`,
+                    url: `/image/${img.id}`
+                })),
+                hovertemplate: `
+                    <b>%{text}</b><br>
+                    <img src="%{customdata.thumbnail}" width="150" height="150"><br>
+                    <i>Click point to navigate</i>
+                    <extra></extra>
+                `
+            };
+            
+            // 3. Define the layout for the chart
+            const layout = {
+                paper_bgcolor: '#1e1e1e',
+                plot_bgcolor: '#1e1e1e',
+                xaxis: { showgrid: false, zeroline: false, showticklabels: false, title: '' },
+                yaxis: { showgrid: false, zeroline: false, showticklabels: false, title: '' },
+                hovermode: 'closest',
+                margin: { l: 0, r: 0, b: 0, t: 0 } // No margins
+            };
+            
+            // 4. Render the plot
+            Plotly.newPlot(mapDiv, [plotData], layout, {responsive: true});
+
+            // 5. Add a click event listener to the plot
+            mapDiv.on('plotly_click', function(data){
+                if (data.points.length > 0) {
+                    const point = data.points[0];
+                    const url = point.customdata.url;
+                    window.location.href = url; // Navigate to the image page
+                }
+            });
+
+        } catch (error) {
+            console.error('Error rendering map:', error);
+            mapDiv.innerHTML = `<p style="color: #e57373;">Error rendering map: ${error.message}</p>`;
+        }
+    }
+
+    renderMap();
+});
+</script>
+{% endblock %}
