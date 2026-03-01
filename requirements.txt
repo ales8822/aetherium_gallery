@@ -17,7 +17,7 @@ transformers
 torch
 faiss-cpu
 sentence-transformers
-google-generativeai
+google-genai
 
 gradio_client
 umap-learn

@@ -1,7 +1,8 @@
-# aetherium_gallery/services/caption_service.py (UPDATED)
+# aetherium_gallery/services/caption_service.py
 import asyncio
 from fastapi.concurrency import run_in_threadpool
-import google.generativeai as genai
+# ▼▼▼ CHANGED IMPORT FOR NEW SDK ▼▼▼
+from google import genai
 from PIL import Image
 from pathlib import Path
 import logging
@@ -14,22 +15,26 @@ logger = logging.getLogger(__name__)
 
 HF_SPACE_NAME = "SmilingWolf/wd-tagger"
 
+# 1. Main Service Class
 class CaptionService:
     def __init__(self):
         logger.info("Initializing API-Driven Caption Service...")
+        
+        # 1.1 Initialize Gemini Client
         google_api_key = os.getenv("GOOGLE_API_KEY")
         if not google_api_key:
-            self.gemini_model = None
+            self.gemini_client = None
             logger.warning("GOOGLE_API_KEY is not set. Gemini features disabled.")
         else:
             try:
-                genai.configure(api_key=google_api_key)
-                self.gemini_model = genai.GenerativeModel('gemini-2.0-flash')
-                logger.info("Gemini 1.5 Flash model configured successfully.")
+                # The new SDK instantiates a Client instead of using a global genai.configure()
+                self.gemini_client = genai.Client(api_key=google_api_key)
+                logger.info("Gemini client configured successfully.")
             except Exception as e:
-                self.gemini_model = None
+                self.gemini_client = None
                 logger.error(f"Failed to configure Gemini: {e}")
 
+        # 1.2 Initialize Gradio Tagger Client
         try:
             self.tagger_client = Client(HF_SPACE_NAME)
             logger.info(f"Gradio client for '{HF_SPACE_NAME}' initialized successfully.")
@@ -37,14 +42,19 @@ class CaptionService:
             self.tagger_client = None
             logger.error(f"Failed to initialize Gradio client: {e}")
 
+    # 2. Helper functions for generation
     async def _generate_description_from_gemini(self, image_path: Path) -> str | None:
-        if not self.gemini_model: return None
+        if not self.gemini_client: return None
         try:
             logger.info(f"Sending request to Gemini for {image_path.name}...")
             img = Image.open(image_path)
-            prompt = "Describe this image in a detailed, single paragraph, focusing on the visual elements and style." # Refined prompt
+            prompt = "Describe this image in a detailed, single paragraph, focusing on the visual elements and style."
             
-            response = await self.gemini_model.generate_content_async([prompt, img], request_options={'timeout': 120})
+            # 2.1 Use the new SDK's async 'aio.models.generate_content' format
+            response = await self.gemini_client.aio.models.generate_content(
+                model='gemini-2.0-flash',
+                contents=[prompt, img]
+            )
             
             return response.text.strip()
         except Exception as e:
@@ -80,17 +90,15 @@ class CaptionService:
             logger.error(f"Error communicating with Gradio client for WD14 Tagger: {e}", exc_info=True)
             return None
 
-    # ▼▼▼ NEW PUBLIC METHOD ▼▼▼
+    # 3. Public access methods
     async def generate_gemini_description(self, image_path: Path) -> str | None:
         """Public method to generate only the Gemini description."""
         return await self._generate_description_from_gemini(image_path)
 
-    # ▼▼▼ NEW PUBLIC METHOD ▼▼▼
     async def generate_wd14_tags(self, image_path: Path) -> str | None:
         """Public method to generate only the WD14 tags."""
         return await self._generate_tags_from_wd14(image_path)
     
-    # --- This original method can remain unchanged ---
     async def generate_caption(self, image_path: Path) -> dict | None:
         description_task = asyncio.create_task(self._generate_description_from_gemini(image_path))
         tags_task = asyncio.create_task(self._generate_tags_from_wd14(image_path))

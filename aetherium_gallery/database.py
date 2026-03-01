@@ -1,3 +1,4 @@
+# database.py 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 from .config import settings
@@ -35,9 +36,9 @@ class Base(DeclarativeBase):
 async def init_db():
     """Initialize the database and create tables."""
     async with engine.begin() as conn:
-        logger.info("Dropping and creating all tables (for development)...")
+        logger.info("Dropping all tables is disabled for now...")
         # In production, use Alembic for migrations instead of dropping tables
-        await conn.run_sync(Base.metadata.drop_all)
+        # await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Database tables created.")
 

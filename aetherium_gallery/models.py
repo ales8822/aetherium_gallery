@@ -30,7 +30,8 @@ class Album(Base):
         "Image",
         back_populates="album",
         cascade="all, delete-orphan",
-        order_by=lambda: models.Image.order_index # Use lambda and the module prefix
+        order_by=lambda: models.Image.order_index,
+        lazy="selectin" 
     )
 
     def __repr__(self):
@@ -43,7 +44,12 @@ class Tag(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True, nullable=False)
 
-    images = relationship("Image", secondary=image_tags_association, back_populates="tags")
+    images = relationship(
+        "Image", 
+        secondary=image_tags_association, 
+        back_populates="tags",
+        lazy="selectin"
+    )
 
     def __repr__(self):
         return f"<Tag(id={self.id}, name='{self.name}')>"
@@ -89,13 +95,13 @@ class Image(Base):
     # Many-to-One relationship to Album (the "many" side)
     # This is the FOREIGN KEY that links an Image to an Album.
     album_id = Column(Integer, ForeignKey("albums.id"), nullable=True, index=True)
-    album = relationship("Album", back_populates="images")
+    album = relationship("Album", back_populates="images", lazy="selectin")
     
     # Many-to-Many relationship to Tags
     tags = relationship("Tag", secondary=image_tags_association, back_populates="images", lazy="selectin")
     # This is the key: an Image post can now point to a VideoSource record.
     video_source_id = Column(Integer, ForeignKey("video_sources.id"), nullable=True, index=True)
-    video_source = relationship("VideoSource", back_populates="image_entry")
+    video_source = relationship("VideoSource", back_populates="image_entry", lazy="selectin")
 
     def __repr__(self):
         return f"<Image(id={self.id}, filename='{self.filename}')>"
@@ -120,7 +126,7 @@ class VideoSource(Base):
     
     # This defines the "one-to-one" relationship back to the Image model.
     # A single video file is represented by a single gallery entry.
-    image_entry = relationship("Image", back_populates="video_source", uselist=False)
+    image_entry = relationship("Image", back_populates="video_source", uselist=False, lazy="selectin")
 
     def __repr__(self):
         return f"<VideoSource(id={self.id}, filename='{self.filename}')>"
