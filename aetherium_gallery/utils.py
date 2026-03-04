@@ -3,7 +3,7 @@ import uuid
 from pathlib import Path
 from PIL import Image as PILImage
 from PIL.ExifTags import TAGS
-from .config import settings
+from .core.config import settings
 from typing import Optional, Dict, Tuple # Import Optional (and Dict/Tuple which might be needed later)
 import logging
 import re

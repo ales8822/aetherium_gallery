@@ -6,9 +6,13 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 import datetime
 
-from .. import crud, schemas
-from ..database import get_db
-from ..config import BASE_DIR
+# --- NEW ARCHITECTURE IMPORTS ---
+from ..core.database import get_db
+from ..core.config import BASE_DIR
+
+# Import Feature Components
+from ..features.albums import service as album_service
+from ..features.albums import schemas as album_schemas
 
 router = APIRouter(
     tags=["Albums Frontend"],
@@ -20,12 +24,12 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 @router.get("/albums", response_class=HTMLResponse, name="list_albums")
 async def list_all_albums(request: Request, db: AsyncSession = Depends(get_db)):
     """Serves the page that lists all created albums."""
-    # The CRUD function now returns a list of (album, image_count) tuples
-    albums_with_counts = await crud.get_all_albums(db)
+    # The Service function returns a list of (album, image_count) tuples
+    albums_with_counts = await album_service.get_all_albums(db)
     
     return templates.TemplateResponse("albums/album_list.html", {
         "request": request,
-        "albums_with_counts": albums_with_counts, # Pass the new structure to the template
+        "albums_with_counts": albums_with_counts,
         "page_title": "All Albums",
         "now": datetime.datetime.now,
     })
@@ -33,29 +37,30 @@ async def list_all_albums(request: Request, db: AsyncSession = Depends(get_db)):
 @router.get("/album/{album_id}", response_class=HTMLResponse, name="view_album")
 async def view_album_contents(request: Request, album_id: int, db: AsyncSession = Depends(get_db)):
     """Serves the gallery page for a single album."""
-    # Our CRUD function now returns a dictionary {'album': ..., 'images': ...}
-    # This prevents SQLAlchemy async lazy-loading errors.
-    album_data = await crud.get_album(db, album_id=album_id)
+    result = await album_service.get_album(db, album_id=album_id)
     
-    if not album_data:
+    if not result:
         raise HTTPException(status_code=404, detail="Album not found")
         
-    # Extract the data from the dictionary
-    album = album_data["album"]
-    images_in_album = album_data["images"]
-    
-    # Check for the safe_mode cookie
+    # Handle both legacy Dict return (from old crud) and new ORM Object return
+    if isinstance(result, dict) and "album" in result:
+        album = result["album"]
+        images_in_album = result["images"]
+    else:
+        # Assuming lazy="selectin" is enabled in models.py, we can access images directly
+        album = result
+        images_in_album = album.images
+
+    # Check for safe_mode
     safe_mode_enabled = request.cookies.get("safe_mode", "off") == "on"
     
-    # The images list from CRUD is already sorted correctly by `order_index`.
-    # We only need to apply the safe mode filter if it's enabled.
     if safe_mode_enabled:
         images_in_album = [img for img in images_in_album if not img.is_nsfw]
 
     return templates.TemplateResponse("albums/album_detail.html", {
         "request": request,
         "album": album,
-        "images": images_in_album, # Pass the filtered and pre-sorted list
+        "images": images_in_album,
         "image_count": len(images_in_album),
         "page_title": f"Album: {album.name}",
         "now": datetime.datetime.now,
@@ -78,15 +83,23 @@ async def handle_create_album_form(
 ):
     """Processes the submission of the create album form."""
     form_data = await request.form()
-    album_create_schema = schemas.AlbumCreate(
+    
+    # Use the schema from features.albums.schemas
+    album_create_schema = album_schemas.AlbumCreate(
         name=form_data.get("name"),
         description=form_data.get("description")
     )
     
-    new_album = await crud.create_album(db, album=album_create_schema)
+    new_album = await album_service.create_album(db, album=album_create_schema)
     
+    # Handle potential dict return from legacy service code
+    if isinstance(new_album, dict):
+        new_id = new_album['album'].id
+    else:
+        new_id = new_album.id
+
     # Redirect to the new album's page
     return RedirectResponse(
-        url=request.url_for('view_album', album_id=new_album.id), 
+        url=request.url_for('view_album', album_id=new_id), 
         status_code=303
     )

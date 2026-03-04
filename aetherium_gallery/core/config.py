@@ -7,7 +7,7 @@ from typing import Optional
 from dotenv import load_dotenv # ▼▼▼ 1. IMPORT load_dotenv ▼▼▼
 
 # Define the base directory of the project
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # ▼▼▼ 2. DEFINE THE PATH TO THE .env FILE ▼▼▼
 ENV_PATH = BASE_DIR / ".env"

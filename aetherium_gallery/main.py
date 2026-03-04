@@ -10,9 +10,15 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 
 # --- Import Order Matters ---
-from .config import settings, BASE_DIR
-from .database import init_db
+from .core.config import settings, BASE_DIR
+from .core.database import init_db
 from .services.vector_service import VectorService
+from .features.images.router import router as images_api_router, upload_router as images_upload_router
+from .features.albums.router import router as albums_api_router
+from .features.images.models import Image, VideoSource # Import models to register them
+from .features.albums.models import Album
+from .features.tags.models import Tag
+
 from .routers import frontend, images, albums, stats
 from .routers.api import albums as albums_api
 from .routers.api import images_api as images_api
@@ -77,11 +83,12 @@ app.mount(f"/{settings.UPLOAD_FOLDER}", StaticFiles(directory=settings.UPLOAD_PA
 app.include_router(frontend.router)
 app.include_router(albums.router)
 app.include_router(stats.router)
-app.include_router(images.upload_router)
-app.include_router(images.router)
-app.include_router(albums_api.router)
-app.include_router(images_api.router)
-app.include_router(generation_api.router) # Include the new router
+app.include_router(images_upload_router)
+app.include_router(images_api_router)
+app.include_router(albums_api_router)
+# app.include_router(albums_api.router) # Decided to keep legacy for now or remove? 
+# app.include_router(images_api.router)
+app.include_router(generation_api.router) 
 app.include_router(metadata_api.router)
 app.include_router(tasks_api.router)
 

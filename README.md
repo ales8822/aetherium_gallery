@@ -6,33 +6,36 @@ A web-based application built with Python (FastAPI) to manage, visualize, and ca
 
 aetherium_gallery/
 ├── aetherium_gallery/
-│ ├── routers/
-│ │ ├── **init**.py
-│ │ ├── frontend.py
-│ │ └── images.py
-│ ├── **init**.py
-│ ├── config.py
-│ ├── crud.py
-│ ├── database.py
-│ ├── main.py
-│ ├── models.py
-│ ├── schemas.py
-│ └── utils.py
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── config.py         # Configuration & Env variables
+│   │   └── database.py       # Database connection & Base class
+│   ├── features/
+│   │   ├── __init__.py
+│   │   ├── images/           # Image Feature (Upload, Process, View)
+│   │   │   ├── router.py
+│   │   │   ├── models.py
+│   │   │   ├── schemas.py
+│   │   │   └── service.py
+│   │   ├── albums/           # Album Feature
+│   │   │   ├── router.py
+│   │   │   ├── models.py
+│   │   │   ├── schemas.py
+│   │   │   └── service.py
+│   │   └── tags/             # Tagging Feature
+│   │       ├── models.py
+│   │       └── schemas.py
+│   ├── main.py               # App entry point
+│   └── utils.py              # Shared utilities
 ├── static/
-│ ├── css/
-│ │ └── style.css
-│ └── js/
-│ └── script.js
 ├── templates/
-│ ├── base.html
-│ ├── image.detail.html
-│ ├── index.html
-│ └── upload.html
 ├── uploads/
 ├── .env
-├── .gitignore
-├── README.md
+├── alembic.ini
 └── requirements.txt
+
+> [!NOTE]
+> The project uses a Feature-Based (Vertical Slice) Architecture. Core logic resides in `core/`, while business logic is grouped by domain in `features/`.
 
 ## Features (Initial Setup)
 

@@ -1,13 +1,22 @@
-<!-- templates/index.html (New Code) -->
-{% extends "base.html" %} {% block title %}{{ page_title }}{% endblock %} {%
-block content %}
+<!-- templates/index.html -->
+{% extends "base.html" %} 
+{% block title %}{{ page_title }}{% endblock %} 
 
-
+{% block content %}
 
 <h1>Gallery</h1>
 
 {% if images %}
-  {% include 'partials/gallery_grid.html' %}
+  <!-- We wrap the include in a specific ID so JS can easily find the container -->
+  <div id="main-gallery-container">
+    {% include 'partials/gallery_grid.html' %}
+  </div>
+
+  <!-- The Trigger for Infinite Scroll -->
+  <div id="infinite-scroll-trigger" style="text-align: center; padding: 2rem; color: #888;">
+    <p>Loading more images...</p>
+  </div>
+
 {% else %}
   <p>
     No images found. <a href="{{ url_for('upload_form') }}">Upload some!</a>
@@ -15,10 +24,5 @@ block content %}
 {% endif %}
 
 {% include 'partials/bulk_actions_panel.html' %}
-
-
-<script>
- 
-</script>
 
 {% endblock %}

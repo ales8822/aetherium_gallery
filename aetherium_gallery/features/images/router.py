@@ -1,27 +1,21 @@
-# aetherium_gallery/routers/images.py
-
-import shutil
+from __future__ import annotations
 import os
-import json
 import io
-import asyncio
 import logging
-from pathlib import Path
+import asyncio
 from typing import List, Optional
-
+from pathlib import Path
+from PIL import Image as PILImage
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, Form, Request
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from PIL import Image as PILImage 
 
-# --- NEW ARCHITECTURE IMPORTS ---
-from ..core.database import get_db
-from ..core.config import settings
-from .. import utils 
+from aetherium_gallery.core.database import get_db
+from aetherium_gallery.core.config import settings
+from aetherium_gallery import utils
+from . import service, models, schemas
 
-# Import Feature Components
-from ..features.images import service as image_service
-from ..features.images import schemas as image_schemas
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/images",
@@ -32,12 +26,7 @@ upload_router = APIRouter(
     tags=["Image Upload"],
 )
 
-logger = logging.getLogger(__name__)
-
-# --- User-Facing Upload Endpoint ---
-
-# CORRECTED: Used image_schemas.Image instead of ImageRead
-@upload_router.post("/upload/single", response_model=image_schemas.Image, name="handle_single_upload_api")
+@upload_router.post("/upload/single", response_model=schemas.Image, name="handle_single_upload_api")
 async def handle_single_upload_api(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -64,7 +53,10 @@ async def handle_single_upload_api(
         "album_id": int(album_id) if album_id and album_id.isdigit() else None,
     }
 
+    image_record_data = {}
+    thumbnail_filename = ""
     saved_path = None 
+
     try:
         content = await file.read()
         file_like_object = io.BytesIO(content)
@@ -76,15 +68,10 @@ async def handle_single_upload_api(
             buffer.write(file_like_object.getvalue())
         
         logger.info(f"Successfully saved uploaded file to: {saved_path}")
-
-        image_record_data = {}
-        thumbnail_filename = ""
-
-        # Process Video
+        
         if content_type.startswith("video/"):
             video_meta, thumbnail_filename = utils.process_video_file(saved_path, filename_stem)
-            
-            video_source_obj = await image_service.create_video_source(db, video_data={
+            video_source_obj = await service.create_video_source(db, video_data={
                 "filename": safe_filename, "filepath": safe_filename, "content_type": content_type,
                 "size_bytes": saved_path.stat().st_size, **video_meta
             })
@@ -93,15 +80,12 @@ async def handle_single_upload_api(
                 "aspect_ratio": video_meta['width'] / video_meta['height'] if video_meta.get('height', 0) > 0 else 0,
                 "video_source_id": video_source_obj.id, "size_bytes": None
             }
-        
-        # Process Image
         else: 
             utils.generate_thumbnail(saved_path, filename_stem)
             thumbnail_filename = f"thumbnails/{filename_stem}_thumb.webp"
             
             image_meta = utils.parse_metadata_from_image(saved_path)
             form_data = {**image_meta, **{k:v for k,v in form_data.items() if v is not None and v != ''}}
-            
             image_record_data = {
                 "width": image_meta.get('width'), "height": image_meta.get('height'),
                 "aspect_ratio": image_meta['width'] / image_meta['height'] if image_meta.get('height', 0) > 0 else 0,
@@ -114,16 +98,14 @@ async def handle_single_upload_api(
             "content_type": content_type, **form_data, **image_record_data
         }
         
-        new_image_record = await image_service.create_image(db, image_data=final_image_data)
+        new_image_record = await service.create_image(db, image_data=final_image_data)
         
-        # Indexing
-        vector_service = request.app.state.vector_service
+        vector_service = getattr(request.app.state, "vector_service", None)
         if vector_service and not content_type.startswith("video/") and saved_path.exists():
              logger.info(f"Indexing new image (ID: {new_image_record.id}) for visual search...")
              vector_service.add_image(image_id=new_image_record.id, image_path=saved_path)
         
         logger.info(f"Successfully processed and created entry for: {original_filename}")
-        return new_image_record
 
     except Exception as e:
         logger.error(f"Upload failed for {original_filename}: {e}", exc_info=True)
@@ -133,47 +115,27 @@ async def handle_single_upload_api(
     finally:
         await file.close()
 
-@router.post("/extract-metadata", summary="Extract metadata from an uploaded image")
-async def extract_metadata_from_image(file: UploadFile = File(...)):
-    if not file.content_type.startswith("image/"):
-        return {"prompt": "", "notes": "Metadata extraction is only available for images."}
-    try:
-        content = await file.read()
-        image = PILImage.open(io.BytesIO(content))
-        extracted_data = utils.parse_metadata_from_image(io.BytesIO(content))
-        width, height = image.size
-        extracted_data["width"] = width
-        extracted_data["height"] = height
-        return extracted_data
-    except Exception as e:
-        logger.error(f"Pillow failed to process image metadata: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to process image metadata: {str(e)}")
+    return new_image_record
 
-
-# --- API Endpoints ---
-
-# CORRECTED: Used image_schemas.Image
-@router.get("/", response_model=List[image_schemas.Image])
+@router.get("/", response_model=List[schemas.Image])
 async def read_images_api(skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)):
-    """API endpoint to retrieve a list of images."""
-    return await image_service.get_images(db, skip=skip, limit=limit)
+    images = await service.get_images(db, skip=skip, limit=limit)
+    return images
 
-# CORRECTED: Used image_schemas.Image
-@router.get("/{image_id}", response_model=image_schemas.Image)
+@router.get("/{image_id}", response_model=schemas.Image)
 async def read_image_api(image_id: int, db: AsyncSession = Depends(get_db)):
-    """API endpoint to retrieve a single image by ID."""
-    db_image = await image_service.get_image(db, image_id=image_id)
+    db_image = await service.get_image(db, image_id=image_id)
     if db_image is None:
         raise HTTPException(status_code=404, detail="Image not found")
     return db_image
 
 @router.post("/bulk-update", status_code=200)
 async def bulk_update_images_api(
-    action_request: image_schemas.BulkActionRequest,
+    action_request: schemas.BulkActionRequest,
     db: AsyncSession = Depends(get_db)
 ):
     try:
-        affected_count = await image_service.bulk_update_images(db, action_request, utils_module=utils)
+        affected_count = await service.bulk_update_images(db, action_request)
         return {
             "message": f"Action '{action_request.action}' performed successfully.",
             "images_affected": affected_count
@@ -182,57 +144,32 @@ async def bulk_update_images_api(
         logger.error(f"Bulk update failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="An internal error occurred during the bulk update.")
 
-# CORRECTED: Used image_schemas.Image
-@router.patch("/{image_id}", response_model=image_schemas.Image)
+@router.patch("/{image_id}", response_model=schemas.Image)
 async def update_image_api(
     image_id: int,
-    image_update: image_schemas.ImageUpdate,
+    image_update: schemas.ImageUpdate,
     db: AsyncSession = Depends(get_db)
 ):
-    """API endpoint to update image metadata."""
-    db_image = await image_service.get_image(db, image_id=image_id)
+    db_image = await service.get_image(db, image_id=image_id)
     if db_image is None:
         raise HTTPException(status_code=404, detail="Image not found")
-    return await image_service.update_image(db=db, db_image=db_image, image_update=image_update)
+    updated_image = await service.update_image(db=db, db_image=db_image, image_update=image_update)
+    return updated_image
 
 @router.delete("/{image_id}", status_code=204, name="delete_image_api")
 @router.post("/delete/{image_id}", response_class=RedirectResponse, status_code=303, name="delete_image_api_post")
 async def delete_image_api(image_id: int, request: Request, db: AsyncSession = Depends(get_db)):
-    db_image = await image_service.get_image(db, image_id) 
+    db_image = await service.get_image(db, image_id)
     if db_image is None:
         raise HTTPException(status_code=404, detail="Image not found")
 
     files_deleted = utils.delete_image_files(db_image.filename, db_image.thumbnail_path)
     if not files_deleted:
-        logger.warning(f"Could not delete files for image ID {image_id}. Proceeding with DB deletion.")
+            logger.warning(f"Could not delete files for image ID {image_id}. Proceeding with DB deletion.")
 
-    deleted_record = await image_service.delete_image(db, image_id=image_id)
+    deleted_record = await service.delete_image(db, image_id=image_id)
     if deleted_record is None:
-        raise HTTPException(status_code=404, detail="Image found initially but failed to delete from DB")
+            raise HTTPException(status_code=404, detail="Image found initially but failed to delete from DB")
 
     gallery_url = request.url_for('gallery_index')
     return RedirectResponse(url=gallery_url, status_code=303)
-
-def save_uploaded_file(file, filename: str) -> Path:
-    file_path = settings.UPLOAD_PATH / filename
-    try:
-        if hasattr(file, 'file'):
-            file.file.seek(0)
-            content = file.file.read()
-        else:
-            file.seek(0)
-            content = file.read()
-
-        with open(file_path, "wb") as buffer:
-            buffer.write(content)
-        
-        logger.info(f"Saved uploaded file to: {file_path}")
-        return file_path
-    except Exception as e:
-        logger.error(f"Error saving file {filename}: {e}", exc_info=True)
-        if file_path.exists():
-            try:
-                os.remove(file_path)
-            except OSError:
-                pass
-        raise

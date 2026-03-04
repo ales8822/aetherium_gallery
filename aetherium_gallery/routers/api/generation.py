@@ -1,18 +1,21 @@
-# aetherium_gallery/routers/api/generation.py (UPDATED)
+# aetherium_gallery/routers/api/generation.py
 
 import logging
 import asyncio
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel
-from typing import Literal, Optional
 import tempfile
 from pathlib import Path
-from fastapi import UploadFile, File, Form
-from ... import crud, schemas
-from ...database import get_db
-from ...config import settings
+from typing import Literal, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
+from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel
+
+# --- NEW ARCHITECTURE IMPORTS ---
+from ...core.database import get_db
+from ...core.config import settings
+from ...features.images import schemas as image_schemas
+from ...features.images import service as image_service
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +23,7 @@ router = APIRouter(
     prefix="/api/generation",
     tags=["Generation API"],
 )
+
 # Add this new response schema
 class GeneratedContentResponse(BaseModel):
     prompt: Optional[str] = None
@@ -29,11 +33,12 @@ class GeneratedContentResponse(BaseModel):
 class GenerationRequest(BaseModel):
     source: Literal['gemini', 'wd14', 'all']
 
-@router.post("/caption/{image_id}", status_code=200, response_model=schemas.Image)
+# CORRECTED: Use image_schemas.Image
+@router.post("/caption/{image_id}", status_code=200, response_model=image_schemas.Image)
 async def generate_caption_for_image(
     request: Request,
     image_id: int,
-    gen_request: GenerationRequest, # The endpoint now expects the new request body
+    gen_request: GenerationRequest, 
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -45,7 +50,8 @@ async def generate_caption_for_image(
     if not caption_service:
         raise HTTPException(status_code=503, detail="Captioning service is not available.")
 
-    db_image = await crud.get_image(db, image_id=image_id)
+    # REPLACEMENT: image_service
+    db_image = await image_service.get_image(db, image_id=image_id)
     if not db_image:
         raise HTTPException(status_code=404, detail="Image not found")
     if db_image.video_source:
@@ -57,10 +63,9 @@ async def generate_caption_for_image(
     
     update_data = {}
 
-    # ▼▼▼ 2. UPDATE THE LOGIC TO HANDLE 'all' ▼▼▼
+    # 2. Handle Generation Sources
     if gen_request.source == 'all':
         logger.info(f"Generating ALL metadata for Image ID {image_id}...")
-        # Call the original combined method from the service
         all_data = await caption_service.generate_caption(image_path)
         if not all_data:
             raise HTTPException(status_code=500, detail="Failed to generate combined metadata.")
@@ -71,17 +76,17 @@ async def generate_caption_for_image(
         combined_tags = ", ".join(sorted(list(existing_tags.union(generated_tags))))
         
         update_data = {
-            "prompt": all_data.get('prompt'), # Use the full prompt from the service
+            "prompt": all_data.get('prompt'),
             "tags": combined_tags
         }
-    # 2. Call the correct service based on the 'source' from the request body
+
     elif gen_request.source == 'gemini':
         logger.info(f"Generating Gemini description for Image ID {image_id}...")
         description = await caption_service.generate_gemini_description(image_path)
         if not description:
             raise HTTPException(status_code=500, detail="Failed to generate description from Gemini.")
         logger.info(f"Generated Gemini description for Image ID {image_id}")
-        update_data['prompt'] = description # We only update the prompt
+        update_data['prompt'] = description
 
     elif gen_request.source == 'wd14':
         logger.info(f"Generating WD14 tags for Image ID {image_id}...")
@@ -90,18 +95,19 @@ async def generate_caption_for_image(
             raise HTTPException(status_code=500, detail="Failed to generate tags from WD14 Tagger.")
         logger.info(f"Generated WD14 tags for Image ID {image_id}")
         
-        # Merge new tags with existing ones, avoiding duplicates
+        # Merge new tags with existing ones
         existing_tags = {tag.name for tag in db_image.tags}
         generated_tags = {tag.strip().lower() for tag in tags_str.split(',') if tag.strip()}
         combined_tags = ", ".join(sorted(list(existing_tags.union(generated_tags))))
-        update_data['tags'] = combined_tags # We only update the tags
+        update_data['tags'] = combined_tags
 
     # 3. If data was generated, create an update schema and save it
     if not update_data:
         raise HTTPException(status_code=400, detail="Invalid generation source provided.")
         
-    update_schema = schemas.ImageUpdate(**update_data)
-    updated_image = await crud.update_image(db, db_image=db_image, image_update=update_schema)
+    # REPLACEMENT: image_schemas and image_service
+    update_schema = image_schemas.ImageUpdate(**update_data)
+    updated_image = await image_service.update_image(db, db_image=db_image, image_update=update_schema)
 
     return updated_image
 
@@ -120,19 +126,15 @@ async def generate_content_for_upload(
     if not caption_service:
         raise HTTPException(status_code=503, detail="Captioning service is not available.")
 
-    # We will manually create and delete the temp file to control its lifecycle.
     temp_path: Optional[Path] = None
     try:
-        # 1. Create a unique path in the system's temp directory.
         temp_dir = Path(tempfile.gettempdir())
         temp_filename = f"{uuid.uuid4()}{Path(file.filename).suffix}"
         temp_path = temp_dir / temp_filename
         
-        # 2. Write the file content and ensure it's closed immediately.
         with open(temp_path, "wb") as buffer:
             buffer.write(await file.read())
         
-        # 3. Now that the file is closed, we can safely pass its path to other services.
         tasks_to_run = []
         if generate_description:
             tasks_to_run.append(caption_service.generate_gemini_description(temp_path))
@@ -167,7 +169,6 @@ async def generate_content_for_upload(
         logger.error(f"Error during upload generation: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to generate content from image.")
     finally:
-        # 4. CRITICAL: Ensure the temporary file is deleted after we're done.
         if temp_path and temp_path.exists():
             try:
                 temp_path.unlink()
