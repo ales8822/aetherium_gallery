@@ -925,6 +925,26 @@ button#reorder-button.active {
     background-color: #03a9f4;
 }
 
+/* placeholder for deleted items */
+.gallery-item.is-deleted {
+    pointer-events: none;
+    background-color: #2a2a2a;
+    border: 1px dashed #444;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100px; /* Ensures the cell doesn't collapse entirely */
+    transition: all 0.3s ease;
+}
+
+.deleted-msg {
+    color: #e57373;
+    font-size: 0.75rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
 /* --- Responsive Adjustments --- */
 @media (max-width: 1200px) {
   .gallery-grid {
