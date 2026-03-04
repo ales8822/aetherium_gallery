@@ -1,218 +1,270 @@
-
-// static/js/script.js
-
-console.log("Aetherium Gallery script loaded.");
-
+// # 1. Main Initialization
 document.addEventListener("DOMContentLoaded", () => {
-     // 1. Setup Infinite Scroll for the Gallery Index
+    // 1.1 Core UI (Safe Mode / Filters)
+    initCoreUI();
+
+    // 1.2 Gallery Features (Lightbox / Info)
+    initGalleryFeatures();
+
+    // 1.3 Bulk Operations (Selection / Delete / Ghosting)
+    initBulkActions();
+
+    // 1.4 Album Specific Features (Reordering / Suggestions)
+    initAlbumFeatures();
+
+    // 1.5 Infinite Scroll
     initInfiniteScroll();
-    
-    // 2. Setup Bulk Selection and Deletion
-    // initBulkSelection();
 });
 
-function initInfiniteScroll() {
-    const trigger = document.getElementById("infinite-scroll-trigger");
-    // We target the first child of our container, which should be your actual CSS grid element (.grid, .gallery, etc.)
-    const galleryContainer = document.querySelector("#main-gallery-container > div") || document.querySelector("#main-gallery-container");
-    
-    // If we aren't on the gallery page, stop here.
-    if (!trigger || !galleryContainer) return;
+// # 2. Core UI Functions
+function initCoreUI() {
+    // 2.1 Safe Mode Toggle
+    const safeToggle = document.getElementById("safe-mode-checkbox");
+    if (safeToggle) {
+        safeToggle.addEventListener("change", () => {
+            const value = safeToggle.checked ? "on" : "off";
+            document.cookie = `safe_mode=${value};path=/;max-age=2592000;samesite=Lax`;
+            window.location.reload();
+        });
+    }
 
-    let skip = 50; // We already loaded the first 50 on initial page load
-    const limit = 50;
-    let isLoading = false;
-    let hasMore = true;
-
-    // Create the IntersectionObserver
-    const observer = new IntersectionObserver(async (entries) => {
-        // When the trigger div enters the viewport
-        if (entries[0].isIntersecting && !isLoading && hasMore) {
-            isLoading = true;
-
-            try {
-                // Fetch the next chunk of images from the backend
-                const response = await fetch(`/gallery-chunk?skip=${skip}&limit=${limit}`);
-                if (!response.ok) throw new Error("Network response was not ok");
-                
-                const html = await response.text();
-                
-                // Parse the returned HTML string into actual DOM nodes
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, "text/html");
-                
-                // Extract the elements. We assume the chunk is wrapped in your grid class.
-                // We just want the child elements (the image cards)
-                const newItemsContainer = doc.body.firstElementChild;
-                
-                if (newItemsContainer && newItemsContainer.children.length > 0) {
-                    // Move each new image card into the existing gallery container
-                    Array.from(newItemsContainer.children).forEach(item => {
-                        galleryContainer.appendChild(item);
-                    });
-                    
-                    // Update our offset for the next fetch
-                    skip += limit;
-                } else {
-                    // No more images returned by the database
-                    hasMore = false;
-                    trigger.innerHTML = "<p>All images loaded.</p>";
-                    trigger.style.color = "#444";
-                }
-            } catch (error) {
-                console.error("Error loading more images:", error);
-                trigger.innerHTML = "<p>Error loading more images.</p>";
-            } finally {
-                isLoading = false;
-            }
-        }
-    }, {
-        // Start fetching slightly before the user reaches the exact bottom (200px ahead of time)
-        rootMargin: "200px" 
-    });
-
-    // Start observing the trigger div
-    observer.observe(trigger);
+    // 2.2 Media Filter Buttons
+    const filterGroup = document.getElementById("media-filter");
+    if (filterGroup) {
+        filterGroup.addEventListener("click", (e) => {
+            const btn = e.target.closest(".media-filter-button");
+            if (!btn) return;
+            document.cookie = `media_filter=${btn.dataset.filter};path=/;max-age=2592000;samesite=Lax`;
+            window.location.reload();
+        });
+    }
 }
 
+// # 3. Gallery Features (Lightboxes)
+function initGalleryFeatures() {
+    const gallery = document.querySelector(".gallery-grid") || document.body;
+    const uploadBaseUrl = document.body.dataset.uploadBaseUrl;
 
-// function initBulkSelection() {
-//     const toggleBtn = document.getElementById('toggle-select-mode');
-//     const galleryContainer = document.getElementById('main-gallery-container');
-//     const bulkPanel = document.getElementById('bulk-actions-panel');
-//     const selectedCountSpan = document.getElementById('selected-count');
-//     const cancelBtn = document.getElementById('cancel-selection-btn');
-//     const deleteBtn = document.getElementById('bulk-delete-btn');
+    gallery.addEventListener("click", (e) => {
+        // Prevent action if in selection mode (handled by initBulkActions)
+        if (document.body.classList.contains("selection-mode-active")) return;
 
-//     if (!toggleBtn || !galleryContainer) return;
+        const infoIcon = e.target.closest(".info-icon");
+        const galleryLink = e.target.closest(".gallery-link");
 
-//     let isSelectMode = false;
-//     let selectedImageIds = new Set(); // Using a Set prevents duplicates automatically
+        // 3.1 Metadata Info Lightbox
+        if (infoIcon) {
+            e.preventDefault();
+            const d = infoIcon.dataset;
+            const content = `
+                <div class="info-lightbox-content">
+                    <h3>${d.filename}</h3>
+                    <dl>
+                        <dt>Sampler</dt><dd>${d.sampler || "N/A"}</dd>
+                        <dt>Steps</dt><dd>${d.steps || "N/A"}</dd>
+                        <dt>CFG</dt><dd>${d.cfg || "N/A"}</dd>
+                        ${d.prompt ? `<dt>Prompt</dt><dd class="prompt">${d.prompt}</dd>` : ""}
+                    </dl>
+                </div>`;
+            basicLightbox.create(content).show();
+            return;
+        }
 
-//     // 1. Toggle Select Mode
-//     toggleBtn.addEventListener('click', () => {
-//         isSelectMode = !isSelectMode;
-        
-//         if (isSelectMode) {
-//             document.body.classList.add('select-mode');
-//             toggleBtn.textContent = "Cancel Selection";
-//             toggleBtn.style.background = "#6c757d";
-//             toggleBtn.style.color = "white";
-//         } else {
-//             exitSelectMode();
-//         }
-//     });
+        // 3.2 Full Image Lightbox
+        if (galleryLink) {
+            e.preventDefault();
+            const isVideo = galleryLink.dataset.isVideo === "true";
+            const mediaUrl = galleryLink.dataset.fullImageUrl;
+            const mediaHtml = isVideo 
+                ? `<video controls autoplay loop muted><source src="${mediaUrl}" type="${galleryLink.dataset.videoType}"></video>`
+                : `<img src="${mediaUrl}">`;
+            
+            const content = `
+                <div class="image-lightbox-container">
+                    ${mediaHtml}
+                    <div class="lightbox-caption">
+                        <span>${galleryLink.querySelector(".filename").textContent}</span>
+                        <a href="${galleryLink.href}" class="lightbox-details-button">Details</a>
+                    </div>
+                </div>`;
+            basicLightbox.create(content).show();
+        }
+    });
+}
 
-//     // Cancel Button inside the panel
-//     if (cancelBtn) {
-//         cancelBtn.addEventListener('click', exitSelectMode);
-//     }
+// # 4. Bulk Operations (The "Ghosting" Deletion Logic)
+function initBulkActions() {
+    const selectBtn = document.getElementById("select-mode-button");
+    const bulkPanel = document.getElementById("bulk-actions-panel");
+    const bulkDeleteBtn = document.getElementById("bulk-delete-btn") || document.getElementById("bulk-action-delete");
+    const bulkAlbumBtn = document.getElementById("bulk-action-add-to-album");
+    const apiUrl = document.body.dataset.apiBulkUrl;
 
-//     // 2. Event Delegation for clicking images
-//     // We attach the listener to the container so it works for infinitely scrolled images too
-//     galleryContainer.addEventListener('click', (e) => {
-//         if (!isSelectMode) return; // Do nothing if not in select mode
-        
-//         // Find the closest parent with class 'gallery-item'
-//         const item = e.target.closest('.gallery-item');
-//         if (!item) return;
+    let selectedIds = new Set();
+    let isMode = false;
 
-//         // Prevent the link from navigating
-//         e.preventDefault();
+    if (!selectBtn) return;
 
-//         const imageId = parseInt(item.getAttribute('data-id'));
-//         if (!imageId) return;
+    // 4.1 Toggle Mode
+    selectBtn.addEventListener("click", () => {
+        isMode = !isMode;
+        document.body.classList.toggle("selection-mode-active", isMode);
+        selectBtn.textContent = isMode ? "Cancel" : "Select";
+        if (!isMode) {
+            selectedIds.clear();
+            document.querySelectorAll(".gallery-item.selected").forEach(el => el.classList.remove("selected"));
+            bulkPanel.classList.remove("visible");
+        }
+    });
 
-//         // Toggle selection state
-//         if (selectedImageIds.has(imageId)) {
-//             selectedImageIds.delete(imageId);
-//             item.classList.remove('selected');
-//         } else {
-//             selectedImageIds.add(imageId);
-//             item.classList.add('selected');
-//         }
+    // 4.2 Click Handling (Event Delegation)
+    document.addEventListener("click", (e) => {
+        if (!isMode) return;
+        const item = e.target.closest(".gallery-item");
+        if (!item || item.classList.contains("is-deleted")) return;
 
-//         updatePanelUI();
-//     });
+        e.preventDefault();
+        const id = parseInt(item.dataset.id);
+        if (selectedIds.has(id)) {
+            selectedIds.delete(id);
+            item.classList.remove("selected");
+        } else {
+            selectedIds.add(id);
+            item.classList.add("selected");
+        }
 
-//     // 3. Update the Panel Visibility and Count
-//     function updatePanelUI() {
-//         selectedCountSpan.textContent = selectedImageIds.size;
-//         if (selectedImageIds.size > 0) {
-//             bulkPanel.classList.add('visible');
-//         } else {
-//             bulkPanel.classList.remove('visible');
-//         }
-//     }
+        const count = selectedIds.size;
+        document.getElementById("selected-count").textContent = count;
+        bulkPanel.classList.toggle("visible", count > 0);
+    });
 
-//     // 4. Exit Select Mode entirely
-//     function exitSelectMode() {
-//         isSelectMode = false;
-//         document.body.classList.remove('select-mode');
-//         toggleBtn.textContent = "Select Images";
-//         toggleBtn.style.background = ""; // Reset to default
-//         toggleBtn.style.color = "";
-        
-//         // Clear all selected visually
-//         document.querySelectorAll('.gallery-item.selected').forEach(item => {
-//             item.classList.remove('selected');
-//         });
-        
-//         selectedImageIds.clear();
-//         updatePanelUI();
-//     }
+    // 4.3 API Action Runner (Handles Ghosting)
+    async function runBulkAction(action, value = null) {
+        const ids = Array.from(selectedIds);
+        try {
+            const resp = await fetch(apiUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ image_ids: ids, action, value })
+            });
+            
+            if (!resp.ok) throw new Error("API Error");
 
-//     // 5. Handle Bulk Delete
-//     if (deleteBtn) {
-//         deleteBtn.addEventListener('click', async () => {
-//             const count = selectedImageIds.size;
-//             if (count === 0) return;
+            if (action === "delete") {
+                // 4.3.1 THE GHOSTING FIX: Replace content instead of reordering
+                ids.forEach(id => {
+                    const el = document.querySelector(`.gallery-item[data-id="${id}"]`);
+                    if (el) {
+                        el.classList.add("is-deleted");
+                        el.classList.remove("selected");
+                        el.innerHTML = '<div class="deleted-msg">Deleted</div>';
+                    }
+                });
+                selectedIds.clear();
+                bulkPanel.classList.remove("visible");
+            } else {
+                window.location.reload();
+            }
+        } catch (err) { alert("Action failed: " + err.message); }
+    }
 
-//             // Confirm with user
-//             const confirmed = confirm(`Are you sure you want to permanently delete ${count} image(s)? This cannot be undone.`);
-//             if (!confirmed) return;
+    if (bulkDeleteBtn) bulkDeleteBtn.addEventListener("click", () => {
+        if (confirm(`Delete ${selectedIds.size} images?`)) runBulkAction("delete");
+    });
 
-//             const idsArray = Array.from(selectedImageIds);
+    if (bulkAlbumBtn) bulkAlbumBtn.addEventListener("click", () => {
+        const albumId = document.getElementById("bulk-add-to-album").value;
+        runBulkAction("add_to_album", albumId === "null" ? null : parseInt(albumId));
+    });
+}
 
-//             try {
-//                 // Change button text while loading
-//                 deleteBtn.textContent = "Deleting...";
-//                 deleteBtn.disabled = true;
+// # 5. Album Specific Features
+function initAlbumFeatures() {
+    const reorderBtn = document.getElementById("reorder-button");
+    const analyzeBtn = document.getElementById("analyze-button");
+    const gridContainer = document.getElementById("album-grid-sortable");
+    const albumBaseUrl = document.body.dataset.apiAlbumUrl;
 
-//                 const response = await fetch('/api/images/bulk-update', {
-//                     method: 'POST',
-//                     headers: {
-//                         'Content-Type': 'application/json',
-//                     },
-//                     body: JSON.stringify({
-//                         image_ids: idsArray,
-//                         action: 'delete'
-//                     })
-//                 });
+    if (!gridContainer) return;
+    const albumId = gridContainer.dataset.albumId;
 
-//                 if (!response.ok) {
-//                     throw new Error(`Server returned ${response.status}`);
-//                 }
+    // 5.1 SortableJS Reordering
+    let sortable = null;
+    if (reorderBtn) {
+        reorderBtn.addEventListener("click", () => {
+            if (sortable) {
+                sortable.destroy();
+                sortable = null;
+                reorderBtn.textContent = "Reorder Images";
+                gridContainer.classList.remove("reordering-active");
+            } else {
+                const list = gridContainer.querySelector(".gallery-grid");
+                sortable = new Sortable(list, {
+                    animation: 150,
+                    ghostClass: "sortable-ghost",
+                    onEnd: async () => {
+                        const ids = Array.from(list.querySelectorAll(".gallery-item")).map(el => parseInt(el.dataset.id));
+                        await fetch(`${albumBaseUrl}/${albumId}/reorder`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ image_ids: ids })
+                        });
+                    }
+                });
+                gridContainer.classList.add("reordering-active");
+                reorderBtn.textContent = "Finish Reordering";
+            }
+        });
+    }
 
-//                 // Success! Remove the elements from the screen without reloading
-//                 idsArray.forEach(id => {
-//                     const el = document.querySelector(`.gallery-item[data-id="${id}"]`);
-//                     if (el) {
-//                         el.remove(); // Remove from DOM
-//                     }
-//                 });
+    // 5.2 Creative Director Suggestions
+    if (analyzeBtn) {
+        analyzeBtn.addEventListener("click", async () => {
+            const grid = document.getElementById("suggestions-grid");
+            const container = document.getElementById("suggestions-container");
+            container.style.display = "block";
+            
+            const resp = await fetch(`${albumBaseUrl}/${albumId}/suggestions`);
+            const images = await resp.json();
+            
+            grid.innerHTML = images.map(img => `
+                <div class="gallery-item" data-id="${img.id}">
+                    <a href="/image/${img.id}">
+                        <img src="/uploads/${img.thumbnail_path}" loading="lazy">
+                    </a>
+                </div>`).join("");
+        });
+    }
+}
 
-//                 // Exit select mode
-//                 exitSelectMode();
+// # 6. Infinite Scroll Logic
+function initInfiniteScroll() {
+    const trigger = document.getElementById("infinite-scroll-trigger");
+    const galleryGrid = document.querySelector("#main-gallery-container .gallery-grid");
+    if (!trigger || !galleryGrid) return;
 
-//             } catch (error) {
-//                 console.error("Bulk delete failed:", error);
-//                 alert("An error occurred while deleting images. Check the console.");
-//             } finally {
-//                 // Reset button
-//                 deleteBtn.textContent = "Delete Selected";
-//                 deleteBtn.disabled = false;
-//             }
-//         });
-//     }
-// }
+    let skip = 50;
+    let isLoading = false;
+
+    const observer = new IntersectionObserver(async (entries) => {
+        if (entries[0].isIntersecting && !isLoading) {
+            isLoading = true;
+            const resp = await fetch(`/gallery-chunk?skip=${skip}&limit=50`);
+            const html = await resp.text();
+            
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, "text/html");
+            const newItems = doc.querySelectorAll(".gallery-item");
+            
+            if (newItems.length > 0) {
+                newItems.forEach(item => galleryGrid.appendChild(item));
+                skip += 50;
+                isLoading = false;
+            } else {
+                trigger.innerHTML = "No more images.";
+            }
+        }
+    }, { rootMargin: "200px" });
+
+    observer.observe(trigger);
+}
