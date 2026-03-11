@@ -1,3 +1,4 @@
+# schemas.py - Pydantic models for tag-related data structures
 from pydantic import BaseModel
 from typing import List
 

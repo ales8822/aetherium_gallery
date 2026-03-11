@@ -1,3 +1,4 @@
+# schemas.py - Pydantic models for Album-related data structures
 from __future__ import annotations
 from pydantic import BaseModel, Field
 from typing import Optional, List, TYPE_CHECKING
@@ -33,3 +34,10 @@ class Album(AlbumBase):
 
 class AlbumReorderRequest(BaseModel):
     image_ids: List[int]
+
+# 1. Runtime import for the Image model
+from aetherium_gallery.features.images.schemas import Image
+from aetherium_gallery.features.tags.schemas import Tag
+
+# 2. Rebuild the Album model
+Album.model_rebuild()

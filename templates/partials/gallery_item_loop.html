@@ -4,6 +4,7 @@
   <div
     class="gallery-item"
     data-id="{{ image.id }}"
+    style="flex-grow: {{ image.aspect_ratio or 1.0 }}; flex-basis: calc({{ image.aspect_ratio or 1.0 }} * 250px);"
   >
     <!-- We'll keep the debug overlay for now, you can remove it later -->
     <div class="order-index-debug" title="Database Order Index">{{ image.order_index }}</div>

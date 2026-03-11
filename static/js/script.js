@@ -43,10 +43,8 @@ function initCoreUI() {
 // # 3. Gallery Features (Lightboxes)
 function initGalleryFeatures() {
     const gallery = document.querySelector(".gallery-grid") || document.body;
-    const uploadBaseUrl = document.body.dataset.uploadBaseUrl;
-
+    
     gallery.addEventListener("click", (e) => {
-        // Prevent action if in selection mode (handled by initBulkActions)
         if (document.body.classList.contains("selection-mode-active")) return;
 
         const infoIcon = e.target.closest(".info-icon");
@@ -70,23 +68,28 @@ function initGalleryFeatures() {
             return;
         }
 
-        // 3.2 Full Image Lightbox
+        // 3.2 Full Image Lightbox (CORRECTED WITH SIZE CONSTRAINTS)
         if (galleryLink) {
             e.preventDefault();
             const isVideo = galleryLink.dataset.isVideo === "true";
             const mediaUrl = galleryLink.dataset.fullImageUrl;
+            
+            // 3.2.1 Added explicit style constraints to prevent overflow
+            const mediaStyle = `style="max-width: 95vw; max-height: 82vh; display: block; object-fit: contain;"`;
+            
             const mediaHtml = isVideo 
-                ? `<video controls autoplay loop muted><source src="${mediaUrl}" type="${galleryLink.dataset.videoType}"></video>`
-                : `<img src="${mediaUrl}">`;
+                ? `<video controls autoplay loop muted ${mediaStyle}><source src="${mediaUrl}" type="${galleryLink.dataset.videoType}"></video>`
+                : `<img src="${mediaUrl}" ${mediaStyle}>`;
             
             const content = `
                 <div class="image-lightbox-container">
                     ${mediaHtml}
                     <div class="lightbox-caption">
-                        <span>${galleryLink.querySelector(".filename").textContent}</span>
-                        <a href="${galleryLink.href}" class="lightbox-details-button">Details</a>
+                        <span class="lightbox-filename">${galleryLink.querySelector(".filename").textContent}</span>
+                        <a href="${galleryLink.href}" class="lightbox-details-button">Details & Actions</a>
                     </div>
                 </div>`;
+            
             basicLightbox.create(content).show();
         }
     });
