@@ -90,23 +90,33 @@ def generate_thumbnail(image_path: Path, filename_stem: str) -> Optional[str]:
         return None
 
 def parse_metadata_from_image(image_path: Path) -> dict:
-    """Parses Stable Diffusion and other metadata from an image file."""
+    """Parses Stable Diffusion and other metadata from an image file with strict type safety."""
     metadata = {}
     try:
         with PILImage.open(image_path) as img:
+            # 1. Basic Dimensions
             metadata['width'], metadata['height'] = img.size
+            
+            # 2. Extract raw parameter string
             param_string = img.info.get('parameters', '') or img.info.get('prompt', '')
 
             if param_string:
-                try: # Handle ComfyUI JSON format
+                try: 
+                    # 2.1 Handle ComfyUI JSON format
                     workflow = json.loads(param_string)
+                    # We look for CLIPTextEncode nodes but ensure the value is actually text
                     for node in workflow.values():
-                        if node.get('class_type') == "CLIPTextEncode" and 'text' in node.get('inputs', {}):
-                           metadata['prompt'] = node['inputs']['text']
-                           break
+                        if node.get('class_type') == "CLIPTextEncode":
+                            text_val = node.get('inputs', {}).get('text')
+                            # Only accept if it's a string. Lists ['18', 0] are node links, not text.
+                            if isinstance(text_val, str):
+                                metadata['prompt'] = text_val
+                                break
                     metadata['notes'] = json.dumps(workflow, indent=2)
-                except json.JSONDecodeError: # Handle A1111/InvokeAI text format
-                    metadata['notes'] = param_string
+                    
+                except (json.JSONDecodeError, TypeError): 
+                    # 2.2 Handle A1111/InvokeAI text format
+                    metadata['notes'] = str(param_string)
                     neg_prompt_match = re.search(r"Negative prompt:\s*([\s\S]+?)(?:Steps:|$)", param_string)
                     if neg_prompt_match:
                         metadata['prompt'] = param_string[:neg_prompt_match.start()].strip()
@@ -125,8 +135,22 @@ def parse_metadata_from_image(image_path: Path) -> dict:
                             elif key_norm == 'seed': metadata['seed'] = int(val_norm)
                             elif key_norm == 'model_hash': metadata['model_hash'] = val_norm
                         except (ValueError, TypeError): continue
+
+        # 3. FINAL TYPE SAFETY CHECK (The "SQLite Fix")
+        # Ensure that text fields are NEVER objects or lists
+        for field in ['prompt', 'negative_prompt', 'sampler', 'model_hash', 'notes']:
+            if field in metadata:
+                if not isinstance(metadata[field], str):
+                    # Convert to string or remove if it's nonsensical
+                    metadata[field] = str(metadata[field])
+                
+                # Truncate extremely long notes if necessary, though Text column handles a lot
+                if field == 'notes' and len(metadata[field]) > 10000:
+                    metadata[field] = metadata[field][:10000] + "... [truncated]"
+
     except Exception as e:
         logger.warning(f"Could not read metadata from {image_path}: {e}")
+        
     return metadata
 
 def save_uploaded_file(file, filename: str) -> Path:
