@@ -1,7 +1,7 @@
 # schemas.py - Pydantic models for image-related data structures
 from __future__ import annotations
 from pydantic import BaseModel, Field
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional, List,Any, TYPE_CHECKING
 from datetime import datetime
 
 if TYPE_CHECKING:
@@ -70,7 +70,7 @@ class Image(ImageBase):
 class BulkActionRequest(BaseModel):
     image_ids: List[int]
     action: str 
-    value: Optional[str | bool] = None
+    value: Optional[Any] = None
 
 
     # 1. Runtime imports to resolve forward references
@@ -79,3 +79,6 @@ from aetherium_gallery.features.tags.schemas import Tag
 
 # 2. Rebuild the Image model now that dependencies are imported
 Image.model_rebuild()
+
+# 3. Rebuild the BulkActionRequest model
+BulkActionRequest.model_rebuild()

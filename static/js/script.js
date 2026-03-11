@@ -178,7 +178,23 @@ function initBulkActions() {
     if (bulkAlbumBtn) bulkAlbumBtn.addEventListener("click", () => {
         const albumId = document.getElementById("bulk-add-to-album").value;
         runBulkAction("add_to_album", albumId === "null" ? null : parseInt(albumId));
+    });if (bulkAlbumBtn) {
+    bulkAlbumBtn.addEventListener("click", () => {
+        const albumSelect = document.getElementById("bulk-add-to-album");
+        const rawValue = albumSelect.value;
+        
+        let finalValue;
+        if (rawValue === "null" || rawValue === "") {
+            finalValue = null;
+        } else {
+            finalValue = parseInt(rawValue, 10);
+        }
+
+        if (confirm(`Move ${selectedIds.size} images to selected album?`)) {
+            runBulkAction("add_to_album", finalValue);
+        }
     });
+}
 }
 
 // # 5. Album Specific Features
